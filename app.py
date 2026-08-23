@@ -159,7 +159,7 @@ def calculate_yang_system(input_date, tz_hours=7):
         return wl_dun, wl_jieqi, wl_yuan
     else:
         # Rơi vào khoảng Nhuận
-        return wl_dun, "", ""s
+        return wl_dun, "", ""
 
 # ==========================================
 # 3. LẬP BÀN TOÁN HỌC
