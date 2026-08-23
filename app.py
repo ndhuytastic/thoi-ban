@@ -607,52 +607,55 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 target_palace = huong_list[loc_huong]
                 is_match = False
                 val_cat_cach = extract_raw_name(loc_cat_cach)
-                dung_cach_tim_thay = "" # Lưu tên phương án Trấn Hung/Thôi Cát
+                dung_cach_tim_thay = "" 
 
                 def check_match(p):
-                    nonlocal dung_cach_tim_thay
+                    dung_cach = ""
                     d = scan_data[p]
                     t_chk = '甲' if d['thien'] == can_tuan_scan else d['thien']
                     d_chk = '甲' if d['dia'] == can_tuan_scan else d['dia']
                     
-                    if loc_thien_can and t_chk != loc_thien_can: return False
-                    if loc_dia_can and d_chk != loc_dia_can: return False
-                    if loc_mon and d['mon'] != loc_mon: return False
-                    if loc_tinh and d['sao'] != loc_tinh: return False
-                    if loc_than and d['than'] != loc_than: return False
+                    if loc_thien_can and t_chk != loc_thien_can: return False, ""
+                    if loc_dia_can and d_chk != loc_dia_can: return False, ""
+                    if loc_mon and d['mon'] != loc_mon: return False, ""
+                    if loc_tinh and d['sao'] != loc_tinh: return False, ""
+                    if loc_than and d['than'] != loc_than: return False, ""
                     
                     if val_cat_cach:
-                        if not any(val_cat_cach in item[0] for item in cung_st_scan[p]): return False
+                        if not any(val_cat_cach in item[0] for item in cung_st_scan[p]): return False, ""
                         
                     if loc_thien_thoi == "Có":
-                        if stem_colors_scan.get(p, "#000000") == "#000000": return False
+                        if stem_colors_scan.get(p, "#000000") == "#000000": return False, ""
                             
                     if loc_dia_loi == "Có":
                         global_lower_gate = scan_data[cung_phi_tinh_scan]['mon']
                         global_lower_tri = GATE_TO_TRIGRAM.get(global_lower_gate, "天")
                         out_upper_tri = TIEN_THIEN_MAP.get(p, "天")
                         out_eval = EVAL_DICT.get(out_upper_tri, {}).get(global_lower_tri, "✕")
-                        if out_eval not in ["〇", "△"]: return False
+                        if out_eval not in ["〇", "△"]: return False, ""
 
                     # --- ÉP ĐIỀU KIỆN TRẤN HUNG / THÔI CÁT VÀO LỌC CHUNG ---
                     if val_tran_hung or val_thoi_cat:
                         found_pa1 = find_fulfilled_plan(pa1_reqs, d, cung_st_scan[p], can_tuan_scan)
                         found_pa2 = find_fulfilled_plan(pa2_reqs, d, cung_st_scan[p], can_tuan_scan)
                         if not found_pa1 and not found_pa2:
-                            return False # Không thỏa mãn điều kiện giải thì loại
+                            return False, "" # Không thỏa mãn điều kiện giải thì loại
                         else:
-                            dung_cach_tim_thay = found_pa1 if found_pa1 else found_pa2
+                            dung_cach = found_pa1 if found_pa1 else found_pa2
                             
-                    return True
+                    return True, dung_cach
 
                 if target_palace:
-                    if target_palace != 5: is_match = check_match(target_palace)
+                    if target_palace != 5: 
+                        is_match, dung_cach_tim_thay = check_match(target_palace)
                 else:
                     for p in range(1, 10):
                         if p == 5: continue
-                        if check_match(p):
+                        match_status, dc_name = check_match(p)
+                        if match_status:
                             is_match = True
                             target_palace = p
+                            dung_cach_tim_thay = dc_name
                             break
                             
                 if is_match:
