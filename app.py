@@ -132,8 +132,7 @@ def lap_que_wolong(can_gio, chi_gio, dun_type, ju_num, chi_ngay):
         cung_data[5]['thien'] = can_gio 
     elif p_hour_stem == 5:
         for i in WOLONG_OUTER_PALACES: cung_data[i]['thien'] = dia_ban[i] 
-        cung_data[p_circle]['thien'] = can_gio 
-        cung_data[5]['thien'] = luc_nghi_gio 
+        cung_data[5]['thien'] = dia_ban[5] 
     else:
         idx_source = WOLONG_OUTER_PALACES.index(p_circle)
         idx_target = WOLONG_OUTER_PALACES.index(p_hour_stem)
