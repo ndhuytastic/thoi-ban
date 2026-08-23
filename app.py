@@ -741,9 +741,13 @@ if st.button("TÌM KIẾM", use_container_width=True):
                     ten_cung = [k for k, v in huong_list.items() if v == target_palace][0]
                     note_str = f" | Phối hợp: {dung_cach_tim_thay}" if dung_cach_tim_thay else ""
                     
-                    # Bóc tách Cát/Hung cách của cung (xóa thẻ HTML span)
-                    cung_formations = [re.sub(r'<[^>]+>', '', item[0]) for item in cung_st_scan[target_palace]]
-                    cach_cuc_str = f" | ❖ {', '.join(cung_formations)}" if cung_formations else ""
+                    # Bóc tách Cát/Hung cách, giữ nguyên cấp độ (1)(2) và nhúng màu Đỏ/Đen
+                    colored_formations = []
+                    for html_name, color in cung_st_scan[target_palace]:
+                        clean_name = re.sub(r'<[^>]+>', '', html_name) # Trích xuất chữ thuần ví dụ: "(1) 青竜返首"
+                        colored_formations.append(f"<span style='color: {color}; font-weight: 500;'>{clean_name}</span>")
+                        
+                    cach_cuc_str = f" | ❖ {', '.join(colored_formations)}" if colored_formations else ""
                     
                     results_normal.append((time_str, c_str, ten_cung, note_str, cach_cuc_str))
 
@@ -751,6 +755,7 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 st.success(f"**TÌM THẤY {len(results_normal)} THỜI ĐIỂM THỎA MÃN TẤT CẢ ĐIỀU KIỆN:**")
                 for idx, (t_str, canchi_str, cung_str, note, cach_cuc) in enumerate(results_normal):
                     h_text = f" | Hướng: {cung_str}" if cung_str else ""
-                    st.write(f"**{idx+1}.** {t_str} | {canchi_str}{h_text}{note}{cach_cuc}")
+                    # Dùng st.markdown với unsafe_allow_html=True để hiển thị được màu HTML
+                    st.markdown(f"**{idx+1}.** {t_str} | {canchi_str}{h_text}{note}{cach_cuc}", unsafe_allow_html=True)
             else:
                 st.warning("Không tìm thấy thời điểm nào thỏa mãn ĐỒNG THỜI các điều kiện của bạn.")
