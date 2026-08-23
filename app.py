@@ -609,6 +609,7 @@ def find_fulfilled_plan(plan_list, d_cung, status_cung, can_tuan_scan):
     return None
 
 if st.button("TÌM KIẾM", use_container_width=True):
+    import re
     val_tran_hung = extract_raw_name(loc_tran_hung)
     val_thoi_cat = extract_raw_name(loc_thoi_cat)
     
@@ -617,7 +618,15 @@ if st.button("TÌM KIẾM", use_container_width=True):
     else:
         with st.spinner('Đang quét dữ liệu tương lai...'):
             results_normal = []
-            current_scan_dt = user_dt.replace(minute=0, second=0, microsecond=0)
+            
+            # --- CĂN CHUẨN GIỜ BẮT ĐẦU VỀ ĐẦU GIỜ LẺ CỦA CAN CHI ---
+            if user_dt.hour % 2 == 0:
+                base_dt = (user_dt - timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+            else:
+                base_dt = user_dt.replace(minute=0, second=0, microsecond=0)
+                
+            # Lùi 1 nhịp để vòng lặp đầu tiên cộng 2 vào là vừa khít giờ hiện tại
+            current_scan_dt = base_dt - timedelta(hours=2) 
             max_limit = 4320
             
             pa1_reqs, pa2_reqs = [], []
@@ -666,8 +675,13 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 for p in range(1, 10):
                     if p != 5: final_hex_scan[p] = global_lower_tri_final
                 
+                # Sửa định dạng chuỗi giờ (Luôn kết thúc là phút 59)
                 end_scan_dt = current_scan_dt + timedelta(hours=1, minutes=59)
-                time_str = f"{current_scan_dt.strftime('%d/%m %H:%M')} - {end_scan_dt.strftime('%H:%M')}"
+                
+                # Nếu giờ bắt đầu là 23:00, nó vắt sang ngày hôm sau nên in ngày s_date (của Can Chi)
+                display_date = s_date if current_scan_dt.hour == 23 else current_scan_dt.date()
+                time_str = f"{display_date.strftime('%d/%m')} {current_scan_dt.strftime('%H:%M')} - {end_scan_dt.strftime('%H:%M')}"
+                
                 c_str = f"{wl_dun_s} {wl_ju_s}局 | Giờ {can_gio_scan}{c_gio_scan}"
                 
                 target_palace = huong_list[loc_huong]
@@ -726,12 +740,17 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 if is_match:
                     ten_cung = [k for k, v in huong_list.items() if v == target_palace][0]
                     note_str = f" | Phối hợp: {dung_cach_tim_thay}" if dung_cach_tim_thay else ""
-                    results_normal.append((time_str, c_str, ten_cung, note_str))
+                    
+                    # Bóc tách Cát/Hung cách của cung (xóa thẻ HTML span)
+                    cung_formations = [re.sub(r'<[^>]+>', '', item[0]) for item in cung_st_scan[target_palace]]
+                    cach_cuc_str = f" | ❖ {', '.join(cung_formations)}" if cung_formations else ""
+                    
+                    results_normal.append((time_str, c_str, ten_cung, note_str, cach_cuc_str))
 
             if results_normal:
                 st.success(f"**TÌM THẤY {len(results_normal)} THỜI ĐIỂM THỎA MÃN TẤT CẢ ĐIỀU KIỆN:**")
-                for idx, (t_str, canchi_str, cung_str, note) in enumerate(results_normal):
+                for idx, (t_str, canchi_str, cung_str, note, cach_cuc) in enumerate(results_normal):
                     h_text = f" | Hướng: {cung_str}" if cung_str else ""
-                    st.write(f"{idx+1}. {t_str} | {canchi_str}{h_text}{note}")
+                    st.write(f"**{idx+1}.** {t_str} | {canchi_str}{h_text}{note}{cach_cuc}")
             else:
                 st.warning("Không tìm thấy thời điểm nào thỏa mãn ĐỒNG THỜI các điều kiện của bạn.")
