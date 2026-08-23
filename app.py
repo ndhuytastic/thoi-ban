@@ -325,7 +325,7 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_ti
         .qmdj-td { border: 1px solid #aaa; width: 33.33%; position: relative; vertical-align: top; padding: 10px; }
         
         /* Căn Can trên và Can dưới ở góc trên trái, width bằng quẻ dịch để thẳng hàng */
-        .top-left-stems { position: absolute; top: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; line-height: 1.2;}
+        .top-left-stems { position: absolute; top: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; line-height: 1.2; gap: 6px;}
         
         /* CÁCH CỤC CHUYỂN LÊN GÓC TRÊN PHẢI */
         .top-right-panel { position: absolute; top: 4px; right: 5px; display: flex; flex-direction: column; align-items: flex-end; text-align: right; font-size: 11px;}
@@ -417,15 +417,7 @@ with col1: selected_date = st.date_input("Ngày Xem", value=st.session_state.ini
 with col2: selected_hour = st.selectbox("Giờ Xem", options=list(range(24)), index=st.session_state.init_dt.hour)
 with col3: selected_minute = st.selectbox("Phút Xem", options=list(range(60)), index=st.session_state.init_dt.minute)
 
-hoa_giap_60 = [thien_can[i%10] + dia_chi[i%12] for i in range(60)]
-cuc_so_list = [f"阳遁{i}局" for i in range(1, 10)] + [f"阴遁{i}局" for i in range(1, 10)]
-
-st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
-_, col_opt1, col_opt2, _ = st.columns([3, 2.5, 2.5, 3])
-with col_opt1: 
-    manual_hoagiap = st.selectbox("Hoa Giáp", options=["Tùy Chọn"] + hoa_giap_60)
-with col_opt2: 
-    manual_cucso = st.selectbox("Cục Số", options=["Tùy Chọn"] + cuc_so_list)
+# --- ĐÃ XÓA BỎ HOÀN TOÀN TÙY CHỌN HOA GIÁP VÀ CỤC SỐ THỦ CÔNG ---
 
 user_dt = datetime.combine(selected_date, datetime.min.time()).replace(hour=selected_hour, minute=selected_minute)
 actual_date = user_dt.date() + timedelta(days=1) if user_dt.hour >= 23 else user_dt.date()
@@ -436,20 +428,14 @@ day_obj = sxtwl.fromSolar(actual_date.year, actual_date.month, actual_date.day)
 lunar_m = day_obj.getLunarMonth()
 lunar_d = day_obj.getLunarDay()
 
+# Kiểm tra Tháng Nhuận
+is_leap_month = day_obj.isLunarLeap()
+
 wl_can, wl_chi, wl_jieqi, wl_yuan, wl_dun = get_wolong_calendar_data(lunar_m, lunar_d)
 can_gio = get_wushu_dun(wl_can, chi_gio)
 hoa_giap_hien_tai = can_gio + chi_gio
 
 wl_ju = calculate_correct_ju(wl_yuan, can_gio, chi_gio, wl_jieqi)
-
-if manual_hoagiap != "Tùy Chọn":
-    can_gio = manual_hoagiap[0]
-    chi_gio = manual_hoagiap[1]
-    hoa_giap_hien_tai = manual_hoagiap
-
-if manual_cucso != "Tùy Chọn":
-    wl_dun = "阳遁" if "阳" in manual_cucso else "阴遁"
-    wl_ju = int(manual_cucso.replace("阳遁", "").replace("阴遁", "").replace("局", ""))
 
 # TÍNH TOÁN BÀN LÕI
 data, p_circle, cung_phi_tinh, p_land = lap_que_wolong(can_gio, chi_gio, wl_dun, wl_ju, wl_chi)
@@ -458,14 +444,17 @@ data, p_circle, cung_phi_tinh, p_land = lap_que_wolong(can_gio, chi_gio, wl_dun,
 can_tuan = get_xun_leader(can_gio, chi_gio)
 cung_st, stem_colors = qimen_analyzer_hojo(data, can_tuan, p_land)
 
-# GỘP TIÊU ĐỀ THÀNH 1 DÒNG DUY NHẤT
-header_text = f"阴: {lunar_m}月 {lunar_d}日 | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}元 | {hoa_giap_hien_tai}时 | {wl_dun}{wl_ju}局"
+# ĐỊNH DẠNG TIÊU ĐỀ (Đổi màu ngày tháng nếu là tháng nhuận)
+if is_leap_month:
+    lunar_date_str = f"<span style='color: #B8860B; font-weight: bold;'>{lunar_m}月 {lunar_d}日 (Nhuận)</span>"
+else:
+    lunar_date_str = f"{lunar_m}月 {lunar_d}日"
+
+header_text = f"阴: {lunar_date_str} | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}元 | {hoa_giap_hien_tai}时 | {wl_dun}{wl_ju}局"
 title = f"<h3 style='margin-bottom:15px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 18px; text-align: center;'>{header_text}</h3>"
-sub_title = "" # Để rỗng vì đã gộp
+sub_title = ""
 
-# GỌI HÀM RENDER (đã bỏ user_birth_star)
 qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, cung_phi_tinh)
-
 combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{sub_title}{qimen_board_html}</div></div>"""
 st.components.v1.html(combined_html, height=500, scrolling=True)
 
@@ -577,30 +566,23 @@ if st.button("TÌM KIẾM", use_container_width=True):
         st.error("Vui lòng không chọn cùng lúc Trấn Hung và Thôi Cát.")
     else:
         with st.spinner('Đang quét dữ liệu tương lai...'):
-            mode = "NORMAL"
-            if val_tran_hung: mode = "TRAN_HUNG"
-            elif val_thoi_cat: mode = "THOI_CAT"
-            
-            results_normal, results_pa1, results_pa2 = [], [], []
+            results_normal = []
             current_scan_dt = user_dt.replace(minute=0, second=0, microsecond=0)
             max_limit = 4320
             
-            if mode == "TRAN_HUNG":
+            # Lấy yêu cầu của Trấn Hung / Thôi cát nếu có chọn
+            pa1_reqs, pa2_reqs = [], []
+            if val_tran_hung:
                 pa1_reqs, pa2_reqs = TRAN_HUNG_DICT[val_tran_hung]
-                if not pa1_reqs and not pa2_reqs: max_limit = 0
-            elif mode == "THOI_CAT":
+            elif val_thoi_cat:
                 pa1_reqs, pa2_reqs = THOI_CAT_DICT[val_thoi_cat]
-                if not pa1_reqs and not pa2_reqs: max_limit = 0
 
             loops = 0
             while loops < max_limit: 
-                if mode == "NORMAL" and len(results_normal) >= 10: break
-                if mode in ["TRAN_HUNG", "THOI_CAT"]:
-                    pa1_reqs, pa2_reqs = TRAN_HUNG_DICT[val_tran_hung] if mode == "TRAN_HUNG" else THOI_CAT_DICT[val_thoi_cat]
-                    if (len(results_pa1) >= 5 or not pa1_reqs) and (len(results_pa2) >= 5 or not pa2_reqs): break
+                if len(results_normal) >= 10: break
 
                 loops += 1
-                current_scan_dt += timedelta(hours=2) # Nhảy thời gian theo Giờ (2 tiếng)
+                current_scan_dt += timedelta(hours=2) 
                 
                 s_date = current_scan_dt.date() + timedelta(days=1) if current_scan_dt.hour >= 23 else current_scan_dt.date()
                 c_gio_idx = 0 if current_scan_dt.hour >= 23 else (current_scan_dt.hour + 1) // 2 % 12
@@ -614,12 +596,8 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 can_gio_scan = get_wushu_dun(wl_can_s, c_gio_scan)
                 wl_ju_s = calculate_correct_ju(wl_yuan_s, can_gio_scan, c_gio_scan, wl_jieqi_s)
                 
-                # CẬP NHẬT: Lấy biến cung_phi_tinh_scan từ hàm lap_que_wolong
                 scan_data, p_circle_scan, cung_phi_tinh_scan, p_land_scan = lap_que_wolong(can_gio_scan, c_gio_scan, wl_dun_s, wl_ju_s, wl_chi_s)
-                
                 can_tuan_scan = get_xun_leader(can_gio_scan, c_gio_scan)
-                
-                # CẬP NHẬT: Lấy biến stem_colors_scan từ hàm qimen_analyzer_hojo
                 cung_st_scan, stem_colors_scan = qimen_analyzer_hojo(scan_data, can_tuan_scan, p_land_scan)
                 
                 end_scan_dt = current_scan_dt + timedelta(hours=1, minutes=59)
@@ -627,86 +605,66 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 c_str = f"{wl_dun_s} {wl_ju_s}局 | Giờ {can_gio_scan}{c_gio_scan}"
                 
                 target_palace = huong_list[loc_huong]
+                is_match = False
+                val_cat_cach = extract_raw_name(loc_cat_cach)
+                dung_cach_tim_thay = "" # Lưu tên phương án Trấn Hung/Thôi Cát
 
-                if mode == "NORMAL":
-                    is_match = False
-                    val_cat_cach = extract_raw_name(loc_cat_cach)
-                    def check_match(p):
-                        d = scan_data[p]
-                        t_chk = '甲' if d['thien'] == can_tuan_scan else d['thien']
-                        d_chk = '甲' if d['dia'] == can_tuan_scan else d['dia']
-                        if loc_thien_can and t_chk != loc_thien_can: return False
-                        if loc_dia_can and d_chk != loc_dia_can: return False
-                        if loc_mon and d['mon'] != loc_mon: return False
-                        if loc_tinh and d['sao'] != loc_tinh: return False
-                        if loc_than and d['than'] != loc_than: return False
-                        if val_cat_cach:
-                            if not any(val_cat_cach in item[0] for item in cung_st_scan[p]): return False
-                            
-                        # --- KIỂM TRA THIÊN THỜI ---
-                        if loc_thien_thoi == "Có":
-                            # "#000000" nghĩa là hung, "#CC0000" nghĩa là cát
-                            if stem_colors_scan.get(p, "#000000") == "#000000":
-                                return False
-                                
-                        # --- KIỂM TRA ĐỊA LỢI ---
-                        if loc_dia_loi == "Có":
-                            global_lower_gate = scan_data[cung_phi_tinh_scan]['mon']
-                            global_lower_tri = GATE_TO_TRIGRAM.get(global_lower_gate, "天")
-                            out_upper_tri = TIEN_THIEN_MAP.get(p, "天")
-                            out_eval = EVAL_DICT.get(out_upper_tri, {}).get(global_lower_tri, "✕")
-                            # Chỉ lấy Quẻ Cát (〇) hoặc Bình hòa (△)
-                            if out_eval not in ["〇", "△"]:
-                                return False
-                                
-                        return True
-
-                    if target_palace:
-                        if target_palace != 5: is_match = check_match(target_palace)
-                    else:
-                        for p in range(1, 10):
-                            if p == 5: continue
-                            if check_match(p):
-                                is_match = True
-                                target_palace = p
-                                break
-                                
-                    if is_match:
-                        ten_cung = [k for k, v in huong_list.items() if v == target_palace][0]
-                        results_normal.append((time_str, c_str, ten_cung))
-
-                else: 
-                    palaces_to_scan = [target_palace] if target_palace else range(1, 10)
-                    for p in palaces_to_scan:
-                        if p == 5 or not p: continue
-                        if len(results_pa1) < 5 and pa1_reqs:
-                            found_pa1 = find_fulfilled_plan(pa1_reqs, scan_data[p], cung_st_scan[p], can_tuan_scan)
-                            if found_pa1:
-                                t_cung = [k for k, v in huong_list.items() if v == p][0]
-                                results_pa1.append((time_str, c_str, t_cung, found_pa1))
+                def check_match(p):
+                    nonlocal dung_cach_tim_thay
+                    d = scan_data[p]
+                    t_chk = '甲' if d['thien'] == can_tuan_scan else d['thien']
+                    d_chk = '甲' if d['dia'] == can_tuan_scan else d['dia']
+                    
+                    if loc_thien_can and t_chk != loc_thien_can: return False
+                    if loc_dia_can and d_chk != loc_dia_can: return False
+                    if loc_mon and d['mon'] != loc_mon: return False
+                    if loc_tinh and d['sao'] != loc_tinh: return False
+                    if loc_than and d['than'] != loc_than: return False
+                    
+                    if val_cat_cach:
+                        if not any(val_cat_cach in item[0] for item in cung_st_scan[p]): return False
                         
-                        if len(results_pa2) < 5 and pa2_reqs:
-                            found_pa2 = find_fulfilled_plan(pa2_reqs, scan_data[p], cung_st_scan[p], can_tuan_scan)
-                            if found_pa2:
-                                t_cung = [k for k, v in huong_list.items() if v == p][0]
-                                results_pa2.append((time_str, c_str, t_cung, found_pa2))
+                    if loc_thien_thoi == "Có":
+                        if stem_colors_scan.get(p, "#000000") == "#000000": return False
+                            
+                    if loc_dia_loi == "Có":
+                        global_lower_gate = scan_data[cung_phi_tinh_scan]['mon']
+                        global_lower_tri = GATE_TO_TRIGRAM.get(global_lower_gate, "天")
+                        out_upper_tri = TIEN_THIEN_MAP.get(p, "天")
+                        out_eval = EVAL_DICT.get(out_upper_tri, {}).get(global_lower_tri, "✕")
+                        if out_eval not in ["〇", "△"]: return False
 
-            if mode == "NORMAL":
-                if results_normal:
-                    st.success(f"**TÌM THẤY {len(results_normal)} KẾT QUẢ:**")
-                    for idx, (t_str, canchi_str, cung_str) in enumerate(results_normal):
-                        h_text = f" | Hướng: {cung_str}" if cung_str else ""
-                        st.write(f"{idx+1}. {t_str} | {canchi_str}{h_text}")
+                    # --- ÉP ĐIỀU KIỆN TRẤN HUNG / THÔI CÁT VÀO LỌC CHUNG ---
+                    if val_tran_hung or val_thoi_cat:
+                        found_pa1 = find_fulfilled_plan(pa1_reqs, d, cung_st_scan[p], can_tuan_scan)
+                        found_pa2 = find_fulfilled_plan(pa2_reqs, d, cung_st_scan[p], can_tuan_scan)
+                        if not found_pa1 and not found_pa2:
+                            return False # Không thỏa mãn điều kiện giải thì loại
+                        else:
+                            dung_cach_tim_thay = found_pa1 if found_pa1 else found_pa2
+                            
+                    return True
+
+                if target_palace:
+                    if target_palace != 5: is_match = check_match(target_palace)
                 else:
-                    st.warning("Không tìm thấy thời điểm nào thỏa mãn điều kiện.")
+                    for p in range(1, 10):
+                        if p == 5: continue
+                        if check_match(p):
+                            is_match = True
+                            target_palace = p
+                            break
+                            
+                if is_match:
+                    ten_cung = [k for k, v in huong_list.items() if v == target_palace][0]
+                    # Nếu có cách giải, in kèm ra màn hình
+                    note_str = f" | Phối hợp: {dung_cach_tim_thay}" if dung_cach_tim_thay else ""
+                    results_normal.append((time_str, c_str, ten_cung, note_str))
+
+            if results_normal:
+                st.success(f"**TÌM THẤY {len(results_normal)} THỜI ĐIỂM THỎA MÃN TẤT CẢ ĐIỀU KIỆN:**")
+                for idx, (t_str, canchi_str, cung_str, note) in enumerate(results_normal):
+                    h_text = f" | Hướng: {cung_str}" if cung_str else ""
+                    st.write(f"{idx+1}. {t_str} | {canchi_str}{h_text}{note}")
             else:
-                if not results_pa1 and not results_pa2 and max_limit > 0:
-                    st.warning(f"Đã quét nhưng không tìm thấy thời điểm nào có thể xử lý.")
-                if results_pa1:
-                    st.success(f"**Phương án 1 (Tìm thấy {len(results_pa1)}):**")
-                    for idx, (t_str, canchi_str, cung_str, dung_cach) in enumerate(results_pa1):
-                        st.write(f"{idx+1}. Dùng **{dung_cach}** | {t_str} | {canchi_str} | Tại: {cung_str}")
-                if results_pa2:
-                    st.success(f"**Phương án 2 (Tìm thấy {len(results_pa2)}):**")
-                    for idx, (t_str, canchi_str, cung_str, dung_cach) in enumerate(results_pa2):
-                        st.write(f"{idx+1}. Dùng **{dung_cach}** | {t_str} | {canchi_str} | Tại: {cung_str}")
+                st.warning("Không tìm thấy thời điểm nào thỏa mãn ĐỒNG THỜI các điều kiện của bạn (Thử nới lỏng bộ lọc).")
