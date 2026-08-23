@@ -311,7 +311,7 @@ def qimen_analyzer_hojo(cung_data, can_tuan, p_land):
 # ==========================================
 # 5. GIAO DIỆN HTML RENDER 
 # ==========================================
-def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_tinh, user_birth_star):
+def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_tinh):
     
     # "地" (HẠ QUÁI) ĐƯỢC XÁC ĐỊNH BỞI TỌA ĐỘ CỬU CUNG PHI TINH
     global_lower_gate = cung_data[cung_phi_tinh]['mon']
@@ -320,26 +320,19 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_ti
     luoi_lac_thu = [[4, 9, 2], [3, 5, 7], [8, 1, 6]]
     html = """
     <style>
-        .qmdj-table { border-collapse: collapse; width: 100%; max-width: 510px; min-width: 400px; height: 430px; table-layout: fixed; font-family: sans-serif; margin: 0 auto; background: #fff;}
+        /* Thu nhỏ khung bàn kỳ môn một chút (max-width 450px, height 380px) */
+        .qmdj-table { border-collapse: collapse; width: 100%; max-width: 450px; min-width: 350px; height: 380px; table-layout: fixed; font-family: sans-serif; margin: 0 auto; background: #fff;}
         .qmdj-td { border: 1px solid #aaa; width: 33.33%; position: relative; vertical-align: top; padding: 10px; }
-        .cell-main {
-            display: grid; grid-template-columns: auto auto 1fr; grid-template-rows: 22px 22px 22px;   
-            column-gap: 15px; row-gap: 6px; height: 100%; min-height: 85px; align-content: start; margin-top: 5px; margin-left: 5px; 
-        }
-        /* THẦN - TINH - MÔN: Màu XÁM NHẸ */
-        .item-than  { grid-column: 1 / span 2; grid-row: 1; font-size: 15px; color: #999999; text-align: left; }
-        .item-tinh  { grid-column: 1; grid-row: 2; font-size: 15px; color: #999999; text-align: left; }
-        .item-mon   { grid-column: 1; grid-row: 3; font-size: 15px; color: #999999; text-align: left; }
         
-        .bottom-left-phitinh { position: absolute; bottom: 3px; left: 5px; font-size: 15px; color: #555; font-weight: bold; }
-        .star-highlight { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: 2px solid #0000FF; border-radius: 50%; color: #0000FF; background-color: rgba(0,0,255,0.05); }
+        /* Căn Can trên và Can dưới ở góc trên trái, width bằng quẻ dịch để thẳng hàng */
+        .top-left-stems { position: absolute; top: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; line-height: 1.2;}
         
         /* CÁCH CỤC CHUYỂN LÊN GÓC TRÊN PHẢI */
         .top-right-panel { position: absolute; top: 4px; right: 5px; display: flex; flex-direction: column; align-items: flex-end; text-align: right; font-size: 11px;}
         .formation-item { margin-top: 1px; font-weight: bold; letter-spacing: 1px; color: #000; }
         
-        /* QUẺ DỊCH CHUYỂN XUỐNG GÓC DƯỚI PHẢI, SÁT LỀ, ĐỘ RỘNG CỐ ĐỊNH ĐỂ CĂN TÊN */
-        .bottom-right-hex { position: absolute; bottom: 5px; right: 2px; display: flex; flex-direction: column; align-items: center; width: 44px; }
+        /* QUẺ DỊCH CHUYỂN XUỐNG GÓC DƯỚI TRÁI, thẳng hàng với Can */
+        .bottom-left-hex { position: absolute; bottom: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; }
     </style>
     <table class="qmdj-table">
     """
@@ -349,13 +342,6 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_ti
         for p in row:
             d = cung_data[p]
             
-            # Vòng tròn xanh Giờ Sinh
-            h_star_val = d['hour_star']
-            if h_star_val == user_birth_star:
-                phi_tinh_html = f"<div class='bottom-left-phitinh'><span class='star-highlight'>{h_star_val}</span></div>"
-            else:
-                phi_tinh_html = f"<div class='bottom-left-phitinh'>{h_star_val}</div>"
-
             # XỬ LÝ MÀU CAN & GẠCH CHÂN GIÁP
             t_can, d_can = d.get('thien', ''), d.get('dia', '')
             base_color = stem_colors.get(p, "#000000") 
@@ -365,13 +351,19 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_ti
             
             t_style = f"font-weight: bold; color: {base_color}; font-size: 16px; text-decoration: {t_decor}; text-underline-offset: 4px; text-decoration-thickness: 2px;"
             d_style = f"font-weight: bold; color: {base_color}; font-size: 16px; text-decoration: {d_decor}; text-underline-offset: 4px; text-decoration-thickness: 2px;"
+            
+            # Khối HTML chứa Thiên bàn can và Địa bàn can
+            stem_html = f"""
+            <div class="top-left-stems">
+                <div style="{t_style}">{t_can}</div>
+                <div style="{d_style}">{d_can}</div>
+            </div>
+            """
 
             if p == 5:
                 html += f"""
                 <td class="qmdj-td" style="background-color: transparent; text-align: center;">
-                    {phi_tinh_html}
-                    <div style="position: absolute; bottom: 30px; right: 6px; {t_style}">{t_can}</div>
-                    <div style="position: absolute; bottom: 6px; right: 6px; {d_style}">{d_can}</div>
+                    {stem_html}
                 </td>"""
             else:
                 out_upper_tri = TIEN_THIEN_MAP[p]
@@ -379,19 +371,18 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_ti
                 
                 out_eval = EVAL_DICT.get(out_upper_tri, {}).get(out_lower_tri, "△")
                 
-                # --- PHÂN LOẠI MÀU SẮC QUẺ DỊCH 3 CẤP ĐỘ ---
                 if out_eval == "〇":
-                    out_hex_color = "#CC0000"  # Cát: Màu Đỏ
+                    out_hex_color = "#CC0000"  # Cát
                 elif out_eval == "△":
-                    out_hex_color = "#B8860B"  # Bình hòa: Màu Vàng Nâu (Dark Goldenrod)
+                    out_hex_color = "#B8860B"  # Bình hòa
                 else:
-                    out_hex_color = "#000000"  # Hung: Màu Đen
-                # -------------------------------------------
+                    out_hex_color = "#000000"  # Hung
+                    
                 out_hex_name = HEX_NAME_DICT.get((out_upper_tri, out_lower_tri), "Không rõ")
                 
-                # Quẻ ở dưới phải (Căn giữa width 44px để thẳng mép)
+                # Quẻ ở dưới trái
                 outer_hex_html = f"""
-                <div class="bottom-right-hex">
+                <div class="bottom-left-hex">
                     <div style="font-size:26px; line-height:0.85; color:{out_hex_color}; margin-bottom: 2px; text-align: center;">
                         {TRIGRAM_UNICODE[out_upper_tri]}<br>{TRIGRAM_UNICODE[out_lower_tri]}
                     </div>
@@ -403,18 +394,12 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_ti
                 form_html = "".join([f"<div class='formation-item' style='color:{f_color};'>{f_name}</div>" for f_name, f_color in cung_status[p]])
                 top_right_html = f"<div class='top-right-panel'>{form_html}</div>"
                 
+                # Render ô (Đã bỏ khối <div class="cell-main"> chứa Thần, Tinh, Môn)
                 html += f"""
                 <td class="qmdj-td" style="background-color: transparent;">
-                    {phi_tinh_html}
                     {top_right_html}
+                    {stem_html}
                     {outer_hex_html}
-                    <div class="cell-main">
-                        <div class="item-than">{d['than']}</div>
-                        <div class="item-tinh">{d['sao']}</div>
-                        <div class="item-mon"><span>{d['mon']}</span></div>
-                        <div style="grid-column: 2; grid-row: 2; text-align: left; display: flex; align-items: center; {t_style}">{t_can}</div>
-                        <div style="grid-column: 2; grid-row: 3; text-align: left; display: flex; align-items: center; {d_style}">{d_can}</div>
-                    </div>
                 </td>"""
         html += "</tr>"
     html += "</table>"
@@ -426,13 +411,11 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_ti
 def get_current_vn_time(): return datetime.now(timezone(timedelta(hours=7)))
 if "init_dt" not in st.session_state: st.session_state.init_dt = get_current_vn_time()
 
-col1, col2, col3, col4, col5, col6 = st.columns([1, 0.8, 0.8, 1, 0.8, 0.8])
+# Bỏ phần nhập liệu Ngày/Giờ/Phút Sinh
+col1, col2, col3 = st.columns([1, 1, 1])
 with col1: selected_date = st.date_input("Ngày Xem", value=st.session_state.init_dt.date(), min_value=date(1900, 1, 1), max_value=date(2100, 12, 31))
 with col2: selected_hour = st.selectbox("Giờ Xem", options=list(range(24)), index=st.session_state.init_dt.hour)
 with col3: selected_minute = st.selectbox("Phút Xem", options=list(range(60)), index=st.session_state.init_dt.minute)
-with col4: birth_date = st.date_input("Ngày Sinh", value=date(1993, 1, 7), min_value=date(1900, 1, 1), max_value=date(2100, 12, 31))
-with col5: birth_hour = st.selectbox("Giờ Sinh", options=list(range(24)), index=8)
-with col6: birth_minute = st.selectbox("Phút Sinh", options=list(range(60)), index=15)
 
 hoa_giap_60 = [thien_can[i%10] + dia_chi[i%12] for i in range(60)]
 cuc_so_list = [f"阳遁{i}局" for i in range(1, 10)] + [f"阴遁{i}局" for i in range(1, 10)]
@@ -459,15 +442,6 @@ hoa_giap_hien_tai = can_gio + chi_gio
 
 wl_ju = calculate_correct_ju(wl_yuan, can_gio, chi_gio, wl_jieqi)
 
-b_dt = datetime.combine(birth_date, datetime.min.time()).replace(hour=birth_hour, minute=birth_minute)
-b_actual_date = b_dt.date() + timedelta(days=1) if b_dt.hour >= 23 else b_dt.date()
-b_chi_idx = 0 if b_dt.hour >= 23 else (b_dt.hour + 1) // 2 % 12
-b_chi_gio = dia_chi[b_chi_idx]
-b_day_obj = sxtwl.fromSolar(b_actual_date.year, b_actual_date.month, b_actual_date.day)
-b_lunar_m = b_day_obj.getLunarMonth()
-b_wl_can, b_wl_chi, _, _, b_wl_dun = get_wolong_calendar_data(b_lunar_m, b_day_obj.getLunarDay())
-user_birth_star = get_hour_nine_star(b_wl_chi, b_chi_gio, b_wl_dun)
-
 if manual_hoagiap != "Tùy Chọn":
     can_gio = manual_hoagiap[0]
     chi_gio = manual_hoagiap[1]
@@ -484,14 +458,16 @@ data, p_circle, cung_phi_tinh, p_land = lap_que_wolong(can_gio, chi_gio, wl_dun,
 can_tuan = get_xun_leader(can_gio, chi_gio)
 cung_st, stem_colors = qimen_analyzer_hojo(data, can_tuan, p_land)
 
-bazi_chuoi = f"农历 {lunar_m}月 {lunar_d}日 | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}元"
-title = f"<h3 style='margin-bottom:8px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 18px; text-align: center;'>{bazi_chuoi}</h3>"
-sub_title = f"<h4 style='margin-top:0px; margin-bottom:15px; font-family:sans-serif; color: #555; font-weight: normal; font-size: 16px; text-align: center;'>{hoa_giap_hien_tai}时 | {wl_dun}{wl_ju}局</h4>"
+# GỘP TIÊU ĐỀ THÀNH 1 DÒNG DUY NHẤT
+header_text = f"阴: {lunar_m}月 {lunar_d}日 | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}元 | {hoa_giap_hien_tai}时 | {wl_dun}{wl_ju}局"
+title = f"<h3 style='margin-bottom:15px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 18px; text-align: center;'>{header_text}</h3>"
+sub_title = "" # Để rỗng vì đã gộp
 
-qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, cung_phi_tinh, user_birth_star)
+# GỌI HÀM RENDER (đã bỏ user_birth_star)
+qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, cung_phi_tinh)
 
 combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{sub_title}{qimen_board_html}</div></div>"""
-st.components.v1.html(combined_html, height=550, scrolling=True)
+st.components.v1.html(combined_html, height=500, scrolling=True)
 
 
 # ==========================================
