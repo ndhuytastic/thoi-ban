@@ -100,6 +100,68 @@ def get_hour_nine_star(day_branch, hour_branch, dun_type):
     res = (start_star + hb_idx) % 9 if dun_type == "阳遁" else (start_star - hb_idx) % 9
     return 9 if res == 0 else res
 
+# --- HỆ THỐNG TÍNH TOÁN DƯƠNG BÀN (NHẬT BÀN THIÊN VĂN) ---
+def get_solstice(year, s_type, local_tz):
+    if s_type == "DC":
+        solstice = ephem.next_winter_solstice(f"{year}-11-01")
+    else:
+        solstice = ephem.next_summer_solstice(f"{year}-05-01")
+    return solstice.datetime().replace(tzinfo=timezone.utc).astimezone(local_tz).date()
+
+def get_closest_giap_ty(target_date):
+    GT_before, dist_before = None, 999
+    for i in range(60):
+        test_date = target_date - timedelta(days=i)
+        if sxtwl.fromSolar(test_date.year, test_date.month, test_date.day).getDayGZ().tg == 0 and \
+           sxtwl.fromSolar(test_date.year, test_date.month, test_date.day).getDayGZ().dz == 0:
+            GT_before, dist_before = test_date, i
+            break
+    GT_after, dist_after = None, 999
+    for i in range(60):
+        test_date = target_date + timedelta(days=i)
+        if sxtwl.fromSolar(test_date.year, test_date.month, test_date.day).getDayGZ().tg == 0 and \
+           sxtwl.fromSolar(test_date.year, test_date.month, test_date.day).getDayGZ().dz == 0:
+            GT_after, dist_after = test_date, i
+            break
+    return GT_before if dist_before < dist_after else GT_after
+
+def calculate_yang_system(input_date, tz_hours=7):
+    local_tz = timezone(timedelta(hours=tz_hours))
+    current_year = input_date.year
+    
+    DC_prev = get_solstice(current_year - 1, "DC", local_tz)
+    HC_curr = get_solstice(current_year, "HC", local_tz)
+    DC_curr = get_solstice(current_year, "DC", local_tz)
+    
+    Anchor_Duong_0 = get_closest_giap_ty(DC_prev)
+    Anchor_Am = get_closest_giap_ty(HC_curr)
+    Anchor_Duong_1 = get_closest_giap_ty(DC_curr)
+    
+    if input_date < Anchor_Am:
+        wl_dun = "阳遁"
+        anchor_date = Anchor_Duong_0
+        jieqi_list = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种"]
+    elif input_date >= Anchor_Am and input_date < Anchor_Duong_1:
+        wl_dun = "阴遁"
+        anchor_date = Anchor_Am
+        jieqi_list = ["夏至", "小暑", "大暑", "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪"]
+    else:
+        wl_dun = "阳遁"
+        anchor_date = Anchor_Duong_1
+        jieqi_list = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种"]
+        
+    days_passed = (input_date - anchor_date).days
+    
+    if days_passed < 180:
+        wl_jieqi = jieqi_list[days_passed // 15]
+        wl_yuan = ["上", "中", "下"][(days_passed % 15) // 5]
+        index = days_passed % 9
+        wl_ju = (index + 1) if wl_dun == "阳遁" else (9 - index)
+        return wl_dun, wl_ju, wl_jieqi, wl_yuan
+    else:
+        # Rơi vào khoảng Nhuận
+        return wl_dun, None, "", ""
+
 # ==========================================
 # 3. LẬP BÀN TOÁN HỌC
 # ==========================================
@@ -311,27 +373,16 @@ def qimen_analyzer_hojo(cung_data, can_tuan, p_land):
 # ==========================================
 # 5. GIAO DIỆN HTML RENDER 
 # ==========================================
-def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_tinh):
-    
-    # "地" (HẠ QUÁI) ĐƯỢC XÁC ĐỊNH BỞI TỌA ĐỘ CỬU CUNG PHI TINH
-    global_lower_gate = cung_data[cung_phi_tinh]['mon']
-    global_lower_tri = GATE_TO_TRIGRAM.get(global_lower_gate, "天")
-
+def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_data, yang_star_data):
     luoi_lac_thu = [[4, 9, 2], [3, 5, 7], [8, 1, 6]]
     html = """
     <style>
-        /* Thu nhỏ khung bàn kỳ môn một chút (max-width 450px, height 380px) */
         .qmdj-table { border-collapse: collapse; width: 100%; max-width: 450px; min-width: 350px; height: 380px; table-layout: fixed; font-family: sans-serif; margin: 0 auto; background: #fff;}
         .qmdj-td { border: 1px solid #aaa; width: 33.33%; position: relative; vertical-align: top; padding: 10px; }
-        
-        /* Căn Can trên và Can dưới ở góc trên trái, width bằng quẻ dịch để thẳng hàng */
         .top-left-stems { position: absolute; top: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; line-height: 1.2; gap: 6px;}
-        
-        /* CÁCH CỤC CHUYỂN LÊN GÓC TRÊN PHẢI */
         .top-right-panel { position: absolute; top: 4px; right: 5px; display: flex; flex-direction: column; align-items: flex-end; text-align: right; font-size: 11px;}
         .formation-item { margin-top: 1px; font-weight: bold; letter-spacing: 1px; color: #000; }
-        
-        /* QUẺ DỊCH CHUYỂN XUỐNG GÓC DƯỚI TRÁI, thẳng hàng với Can */
+        .bottom-right-phitinh { position: absolute; bottom: 3px; right: 5px; font-size: 15px; color: #555; font-weight: bold; }
         .bottom-left-hex { position: absolute; bottom: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; }
     </style>
     <table class="qmdj-table">
@@ -341,122 +392,110 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, cung_phi_ti
         html += "<tr>"
         for p in row:
             d = cung_data[p]
-            
-            # XỬ LÝ MÀU CAN & GẠCH CHÂN GIÁP
             t_can, d_can = d.get('thien', ''), d.get('dia', '')
             base_color = stem_colors.get(p, "#000000") 
-            
             t_decor = "underline" if t_can == can_tuan else "none"
             d_decor = "underline" if d_can == can_tuan else "none"
-            
             t_style = f"font-weight: bold; color: {base_color}; font-size: 16px; text-decoration: {t_decor}; text-underline-offset: 4px; text-decoration-thickness: 2px;"
             d_style = f"font-weight: bold; color: {base_color}; font-size: 16px; text-decoration: {d_decor}; text-underline-offset: 4px; text-decoration-thickness: 2px;"
             
-            # Khối HTML chứa Thiên bàn can và Địa bàn can
-            stem_html = f"""
-            <div class="top-left-stems">
-                <div style="{t_style}">{t_can}</div>
-                <div style="{d_style}">{d_can}</div>
-            </div>
-            """
+            stem_html = f'<div class="top-left-stems"><div style="{t_style}">{t_can}</div><div style="{d_style}">{d_can}</div></div>'
+            phi_tinh_html = f"<div class='bottom-right-phitinh'>{yang_star_data.get(p, '')}</div>"
 
             if p == 5:
-                html += f"""
-                <td class="qmdj-td" style="background-color: transparent; text-align: center;">
-                    {stem_html}
-                </td>"""
+                html += f'<td class="qmdj-td" style="background-color: transparent; text-align: center;">{stem_html}{phi_tinh_html}</td>'
             else:
-                out_upper_tri = TIEN_THIEN_MAP[p]
-                out_lower_tri = global_lower_tri 
-                
-                out_eval = EVAL_DICT.get(out_upper_tri, {}).get(out_lower_tri, "△")
-                
-                if out_eval == "〇":
-                    out_hex_color = "#CC0000"  # Cát
-                elif out_eval == "△":
-                    out_hex_color = "#B8860B"  # Bình hòa
-                else:
-                    out_hex_color = "#000000"  # Hung
+                outer_hex_html = ""
+                global_lower_tri = final_hex_data.get(p)
+                if global_lower_tri:
+                    out_upper_tri = TIEN_THIEN_MAP[p]
+                    out_eval = EVAL_DICT.get(out_upper_tri, {}).get(global_lower_tri, "△")
+                    if out_eval == "〇": out_hex_color = "#CC0000"
+                    elif out_eval == "△": out_hex_color = "#B8860B"
+                    else: out_hex_color = "#000000"
+                    out_hex_name = HEX_NAME_DICT.get((out_upper_tri, global_lower_tri), "Không rõ")
                     
-                out_hex_name = HEX_NAME_DICT.get((out_upper_tri, out_lower_tri), "Không rõ")
-                
-                # Quẻ ở dưới trái
-                outer_hex_html = f"""
-                <div class="bottom-left-hex">
-                    <div style="font-size:26px; line-height:0.85; color:{out_hex_color}; margin-bottom: 2px; text-align: center;">
-                        {TRIGRAM_UNICODE[out_upper_tri]}<br>{TRIGRAM_UNICODE[out_lower_tri]}
+                    outer_hex_html = f"""
+                    <div class="bottom-left-hex">
+                        <div style="font-size:26px; line-height:0.85; color:{out_hex_color}; margin-bottom: 2px; text-align: center;">
+                            {TRIGRAM_UNICODE[out_upper_tri]}<br>{TRIGRAM_UNICODE[global_lower_tri]}
+                        </div>
+                        <div style="width: 100%; font-size:10px; font-weight:normal; color:#999999; letter-spacing: -0.5px; text-align: center;">{out_hex_name}</div>
                     </div>
-                    <div style="width: 100%; font-size:10px; font-weight:normal; color:#999999; letter-spacing: -0.5px; text-align: center;">{out_hex_name}</div>
-                </div>
-                """
+                    """
 
-                # Cách cục ở trên phải
                 form_html = "".join([f"<div class='formation-item' style='color:{f_color};'>{f_name}</div>" for f_name, f_color in cung_status[p]])
                 top_right_html = f"<div class='top-right-panel'>{form_html}</div>"
-                
-                # Render ô (Đã bỏ khối <div class="cell-main"> chứa Thần, Tinh, Môn)
-                html += f"""
-                <td class="qmdj-td" style="background-color: transparent;">
-                    {top_right_html}
-                    {stem_html}
-                    {outer_hex_html}
-                </td>"""
+                html += f'<td class="qmdj-td" style="background-color: transparent;">{top_right_html}{stem_html}{outer_hex_html}{phi_tinh_html}</td>'
         html += "</tr>"
     html += "</table>"
     return html
 
 # ==========================================
-# 6. STREAMLIT APP MAIN
+# 6. STREAMLIT APP MAIN & KHỞI CHẠY DỮ LIỆU
 # ==========================================
 def get_current_vn_time(): return datetime.now(timezone(timedelta(hours=7)))
 if "init_dt" not in st.session_state: st.session_state.init_dt = get_current_vn_time()
 
-# Bỏ phần nhập liệu Ngày/Giờ/Phút Sinh
 col1, col2, col3 = st.columns([1, 1, 1])
 with col1: selected_date = st.date_input("Ngày Xem", value=st.session_state.init_dt.date(), min_value=date(1900, 1, 1), max_value=date(2100, 12, 31))
 with col2: selected_hour = st.selectbox("Giờ Xem", options=list(range(24)), index=st.session_state.init_dt.hour)
 with col3: selected_minute = st.selectbox("Phút Xem", options=list(range(60)), index=st.session_state.init_dt.minute)
-
-# --- ĐÃ XÓA BỎ HOÀN TOÀN TÙY CHỌN HOA GIÁP VÀ CỤC SỐ THỦ CÔNG ---
 
 user_dt = datetime.combine(selected_date, datetime.min.time()).replace(hour=selected_hour, minute=selected_minute)
 actual_date = user_dt.date() + timedelta(days=1) if user_dt.hour >= 23 else user_dt.date()
 chi_gio_idx = 0 if user_dt.hour >= 23 else (user_dt.hour + 1) // 2 % 12
 chi_gio = dia_chi[chi_gio_idx]
 
+# --- HỆ ÂM (TRUYỀN THỐNG) ---
 day_obj = sxtwl.fromSolar(actual_date.year, actual_date.month, actual_date.day)
-lunar_m = day_obj.getLunarMonth()
-lunar_d = day_obj.getLunarDay()
-
-# Kiểm tra Tháng Nhuận
+lunar_m, lunar_d = day_obj.getLunarMonth(), day_obj.getLunarDay()
 is_leap_month = day_obj.isLunarLeap()
-
 wl_can, wl_chi, wl_jieqi, wl_yuan, wl_dun = get_wolong_calendar_data(lunar_m, lunar_d)
 can_gio = get_wushu_dun(wl_can, chi_gio)
 hoa_giap_hien_tai = can_gio + chi_gio
-
 wl_ju = calculate_correct_ju(wl_yuan, can_gio, chi_gio, wl_jieqi)
 
-# TÍNH TOÁN BÀN LÕI
+# Tính Bàn Âm
 data, p_circle, cung_phi_tinh, p_land = lap_que_wolong(can_gio, chi_gio, wl_dun, wl_ju, wl_chi)
-
-# XỬ LÝ CÁCH CỤC
 can_tuan = get_xun_leader(can_gio, chi_gio)
 cung_st, stem_colors = qimen_analyzer_hojo(data, can_tuan, p_land)
 
-# ĐỊNH DẠNG TIÊU ĐỀ (Đổi màu ngày tháng nếu là tháng nhuận)
-if is_leap_month:
-    lunar_date_str = f"<span style='color: #B8860B; font-weight: bold;'>{lunar_m}月 {lunar_d}日 (Nhuận)</span>"
+# --- HỆ DƯƠNG (THIÊN VĂN) ---
+y_dun, y_ju, y_jieqi, y_yuan = calculate_yang_system(actual_date, 7)
+
+# 1. Tính Cửu Cung Phi Tinh Giờ (Hệ Dương - Luôn tính được)
+yang_star_data = {}
+curr_star = get_hour_nine_star(wl_chi, chi_gio, y_dun)
+for cung in WOLONG_FLYING_PATH:
+    yang_star_data[cung] = curr_star
+    curr_star = 1 if curr_star == 9 else curr_star + 1
+
+# 2. Tính Quẻ Dịch (Ưu tiên Dương, Fallback Âm)
+final_hex_data = {}
+if y_ju is not None:
+    y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(can_gio, chi_gio, y_dun, y_ju, wl_chi)
+    global_lower_gate_final = y_data[y_cung_phi_tinh]['mon']
 else:
-    lunar_date_str = f"{lunar_m}月 {lunar_d}日"
+    global_lower_gate_final = data[cung_phi_tinh]['mon'] # Lấy từ Bàn Âm
 
-header_text = f"阴: {lunar_date_str} | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}元 | {hoa_giap_hien_tai}时 | {wl_dun}{wl_ju}局"
-title = f"<h3 style='margin-bottom:15px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 18px; text-align: center;'>{header_text}</h3>"
-sub_title = ""
+global_lower_tri_final = GATE_TO_TRIGRAM.get(global_lower_gate_final, "天")
+for p in range(1, 10):
+    if p != 5: final_hex_data[p] = global_lower_tri_final
 
-qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, cung_phi_tinh)
-combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{sub_title}{qimen_board_html}</div></div>"""
-st.components.v1.html(combined_html, height=500, scrolling=True)
+# --- XUẤT HIỂN THỊ GIAO DIỆN ---
+y_ju_str = f"{y_ju}局" if y_ju else "(Nhuận)"
+y_info = f"{y_jieqi} {y_yuan}元" if y_ju else ""
+header_yang = f"阳: {actual_date.month}月 {actual_date.day}日 | {wl_can}{wl_chi} | {y_info} | {hoa_giap_hien_tai}时 | {y_dun}{y_ju_str}"
+
+lunar_date_str = f"<span style='color: #B8860B; font-weight: bold;'>{lunar_m}月 {lunar_d}日 (Nhuận)</span>" if is_leap_month else f"{lunar_m}月 {lunar_d}日"
+header_yin = f"阴: {lunar_date_str} | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}元 | {hoa_giap_hien_tai}时 | {wl_dun}{wl_ju}局"
+
+title = f"<h3 style='margin-bottom:5px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 16px; text-align: center;'>{header_yang}<br><span style='font-size: 18px;'>{header_yin}</span></h3>"
+
+qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, final_hex_data, yang_star_data)
+combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{qimen_board_html}</div></div>"""
+st.components.v1.html(combined_html, height=480, scrolling=True)
 
 
 # ==========================================
@@ -470,10 +509,8 @@ FORMATION_RANKS_LOCAL = {
     "大格": 1, "小格": 1, "刑格": 1, "戦格": 1, "飛宮格": 1, "伏宮格": 1, 
     "青竜逃走": 1, "白虎猖狂": 1, "熒惑入白": 1, "太白入熒": 1, "朱雀投江": 1, "螣蛇妖嬌": 1,
     "青竜返首": 2, "飛鳥跌穴": 2, "玉女守門": 2, "乙奇得使": 2, "丙奇得使": 2, "丁奇得使": 2, 
-    "竜遁": 2, "虎遁": 2, "風遁": 2, "雲遁": 2, 
-    "乙奇入墓": 2, "丙奇入墓": 2, "丁奇入墓": 2,
-    "干伏吟": 2, "干反吟": 2, 
-    "乙奇昇殿": 3, "丙奇昇殿": 3, "丁奇昇殿": 3,
+    "竜遁": 2, "虎遁": 2, "風遁": 2, "雲遁": 2, "乙奇入墓": 2, "丙奇入墓": 2, "丁奇入墓": 2,
+    "干伏吟": 2, "干反吟": 2, "乙奇昇殿": 3, "丙奇昇殿": 3, "丁奇昇殿": 3,
     "星門伏吟": 3, "星門反吟": 3, "八门受制": 3, "六儀撃刑": 3
 }
 
@@ -483,8 +520,7 @@ def format_ui_list(raw_list):
     res = [""]
     for x in valid_items:
         rank = FORMATION_RANKS_LOCAL.get(x)
-        if rank: res.append(f"({rank}) {x}")
-        else: res.append(x)
+        res.append(f"({rank}) {x}" if rank else x)
     return res
 
 def extract_raw_name(ui_name):
@@ -545,7 +581,6 @@ with st.container():
     c9, c10, c11, c12 = st.columns(4)
     loc_tran_hung = c9.selectbox("鎮凶 (Trấn Hung)", options=tran_hung_list)
     loc_thoi_cat = c10.selectbox("催吉 (Thôi Cát)", options=thoi_cat_list)
-    # 2 Mục lựa chọn mới
     loc_thien_thoi = c11.selectbox("天时 (Thiên Thời)", options=["", "Có"])
     loc_dia_loi = c12.selectbox("地利 (Địa Lợi)", options=["", "Có"])
 
@@ -570,12 +605,9 @@ if st.button("TÌM KIẾM", use_container_width=True):
             current_scan_dt = user_dt.replace(minute=0, second=0, microsecond=0)
             max_limit = 4320
             
-            # Lấy yêu cầu của Trấn Hung / Thôi cát nếu có chọn
             pa1_reqs, pa2_reqs = [], []
-            if val_tran_hung:
-                pa1_reqs, pa2_reqs = TRAN_HUNG_DICT[val_tran_hung]
-            elif val_thoi_cat:
-                pa1_reqs, pa2_reqs = THOI_CAT_DICT[val_thoi_cat]
+            if val_tran_hung: pa1_reqs, pa2_reqs = TRAN_HUNG_DICT[val_tran_hung]
+            elif val_thoi_cat: pa1_reqs, pa2_reqs = THOI_CAT_DICT[val_thoi_cat]
 
             loops = 0
             while loops < max_limit: 
@@ -589,16 +621,29 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 c_gio_scan = dia_chi[c_gio_idx]
                 
                 s_obj = sxtwl.fromSolar(s_date.year, s_date.month, s_date.day)
-                lm_scan = s_obj.getLunarMonth()
-                ld_scan = s_obj.getLunarDay()
+                lm_scan, ld_scan = s_obj.getLunarMonth(), s_obj.getLunarDay()
                 
+                # Bàn Âm
                 wl_can_s, wl_chi_s, wl_jieqi_s, wl_yuan_s, wl_dun_s = get_wolong_calendar_data(lm_scan, ld_scan)
                 can_gio_scan = get_wushu_dun(wl_can_s, c_gio_scan)
                 wl_ju_s = calculate_correct_ju(wl_yuan_s, can_gio_scan, c_gio_scan, wl_jieqi_s)
-                
-                scan_data, p_circle_scan, cung_phi_tinh_scan, p_land_scan = lap_que_wolong(can_gio_scan, c_gio_scan, wl_dun_s, wl_ju_s, wl_chi_s)
+                scan_data, _, cpt_scan, p_land_scan = lap_que_wolong(can_gio_scan, c_gio_scan, wl_dun_s, wl_ju_s, wl_chi_s)
                 can_tuan_scan = get_xun_leader(can_gio_scan, c_gio_scan)
                 cung_st_scan, stem_colors_scan = qimen_analyzer_hojo(scan_data, can_tuan_scan, p_land_scan)
+                
+                # Quẻ Địa Lợi (Ưu tiên Dương, Fallback Âm)
+                y_dun_s, y_ju_s, _, _ = calculate_yang_system(s_date, 7)
+                final_hex_scan = {}
+                
+                if y_ju_s is not None:
+                    y_data_s, _, y_cpt_s, _ = lap_que_wolong(can_gio_scan, c_gio_scan, y_dun_s, y_ju_s, wl_chi_s)
+                    global_lower_gate_final = y_data_s[y_cpt_s]['mon']
+                else:
+                    global_lower_gate_final = scan_data[cpt_scan]['mon'] # Fallback lấy từ Bàn Âm
+                
+                global_lower_tri_final = GATE_TO_TRIGRAM.get(global_lower_gate_final, "天")
+                for p in range(1, 10):
+                    if p != 5: final_hex_scan[p] = global_lower_tri_final
                 
                 end_scan_dt = current_scan_dt + timedelta(hours=1, minutes=59)
                 time_str = f"{current_scan_dt.strftime('%d/%m %H:%M')} - {end_scan_dt.strftime('%H:%M')}"
@@ -627,19 +672,18 @@ if st.button("TÌM KIẾM", use_container_width=True):
                     if loc_thien_thoi == "Có":
                         if stem_colors_scan.get(p, "#000000") == "#000000": return False, ""
                             
+                    # Soi Địa Lợi (Sử dụng Quẻ đã Fallback tự động)
                     if loc_dia_loi == "Có":
-                        global_lower_gate = scan_data[cung_phi_tinh_scan]['mon']
-                        global_lower_tri = GATE_TO_TRIGRAM.get(global_lower_gate, "天")
-                        out_upper_tri = TIEN_THIEN_MAP.get(p, "天")
-                        out_eval = EVAL_DICT.get(out_upper_tri, {}).get(global_lower_tri, "✕")
+                        lower_tri = final_hex_scan.get(p)
+                        upper_tri = TIEN_THIEN_MAP.get(p, "天")
+                        out_eval = EVAL_DICT.get(upper_tri, {}).get(lower_tri, "✕")
                         if out_eval not in ["〇", "△"]: return False, ""
 
-                    # --- ÉP ĐIỀU KIỆN TRẤN HUNG / THÔI CÁT VÀO LỌC CHUNG ---
                     if val_tran_hung or val_thoi_cat:
                         found_pa1 = find_fulfilled_plan(pa1_reqs, d, cung_st_scan[p], can_tuan_scan)
                         found_pa2 = find_fulfilled_plan(pa2_reqs, d, cung_st_scan[p], can_tuan_scan)
                         if not found_pa1 and not found_pa2:
-                            return False, "" # Không thỏa mãn điều kiện giải thì loại
+                            return False, "" 
                         else:
                             dung_cach = found_pa1 if found_pa1 else found_pa2
                             
@@ -660,7 +704,6 @@ if st.button("TÌM KIẾM", use_container_width=True):
                             
                 if is_match:
                     ten_cung = [k for k, v in huong_list.items() if v == target_palace][0]
-                    # Nếu có cách giải, in kèm ra màn hình
                     note_str = f" | Phối hợp: {dung_cach_tim_thay}" if dung_cach_tim_thay else ""
                     results_normal.append((time_str, c_str, ten_cung, note_str))
 
@@ -670,4 +713,4 @@ if st.button("TÌM KIẾM", use_container_width=True):
                     h_text = f" | Hướng: {cung_str}" if cung_str else ""
                     st.write(f"{idx+1}. {t_str} | {canchi_str}{h_text}{note}")
             else:
-                st.warning("Không tìm thấy thời điểm nào thỏa mãn ĐỒNG THỜI các điều kiện của bạn (Thử nới lỏng bộ lọc).")
+                st.warning("Không tìm thấy thời điểm nào thỏa mãn ĐỒNG THỜI các điều kiện của bạn.")
