@@ -524,9 +524,19 @@ def get_current_vn_time(): return datetime.now(timezone(timedelta(hours=7)))
 
 if "init_dt" not in st.session_state: st.session_state.init_dt = get_current_vn_time()
 
-col1, col2 = st.columns(2)
-with col1: selected_date = st.date_input("Ngày", value=st.session_state.init_dt.date(), min_value=datetime(1900, 1, 1).date(), max_value=datetime(2100, 12, 31).date())
-with col2: selected_time = st.time_input("Giờ Phút", st.session_state.init_dt.time(), step=60)
+# Chia làm 4 cột để nhập Năm, Tháng, Ngày, Giờ
+c_y, c_m, c_d, c_t = st.columns([1, 1, 1, 1.5])
+with c_y: input_year = st.number_input("Năm", min_value=1900, max_value=2100, value=st.session_state.init_dt.year)
+with c_m: input_month = st.number_input("Tháng", min_value=1, max_value=12, value=st.session_state.init_dt.month)
+with c_d: input_day = st.number_input("Ngày", min_value=1, max_value=31, value=st.session_state.init_dt.day)
+with c_t: selected_time = st.time_input("Giờ Phút", st.session_state.init_dt.time(), step=60)
+
+# Bắt lỗi nếu nhập sai ngày (VD: tháng 2 nhập ngày 31)
+try:
+    selected_date = datetime(input_year, input_month, input_day).date()
+except ValueError:
+    st.error("Ngày không hợp lệ trong tháng này! App sẽ tự lùi về ngày mùng 1.")
+    selected_date = datetime(input_year, input_month, 1).date()
 
 user_dt = datetime.combine(selected_date, selected_time)
 
