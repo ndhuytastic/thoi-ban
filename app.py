@@ -156,12 +156,10 @@ def calculate_yang_system(input_date, tz_hours=7):
     if days_passed < 180:
         wl_jieqi = jieqi_list[days_passed // 15]
         wl_yuan = ["上", "中", "下"][(days_passed % 15) // 5]
-        index = days_passed % 9
-        wl_ju = (index + 1) if wl_dun == "阳遁" else (9 - index)
-        return wl_dun, wl_ju, wl_jieqi, wl_yuan
+        return wl_dun, wl_jieqi, wl_yuan
     else:
         # Rơi vào khoảng Nhuận
-        return wl_dun, None, "", ""
+        return wl_dun, "", ""s
 
 # ==========================================
 # 3. LẬP BÀN TOÁN HỌC
@@ -448,37 +446,53 @@ actual_date = user_dt.date() + timedelta(days=1) if user_dt.hour >= 23 else user
 chi_gio_idx = 0 if user_dt.hour >= 23 else (user_dt.hour + 1) // 2 % 12
 chi_gio = dia_chi[chi_gio_idx]
 
-# --- HỆ ÂM (TRUYỀN THỐNG) ---
+# --- LẤY DỮ LIỆU LỊCH CHUNG TỪ SXTWL ---
 day_obj = sxtwl.fromSolar(actual_date.year, actual_date.month, actual_date.day)
+
+# ==========================================
+# LUỒNG 1: HỆ ÂM (TRUYỀN THỐNG BẰNG CÔNG THỨC)
+# ==========================================
 lunar_m, lunar_d = day_obj.getLunarMonth(), day_obj.getLunarDay()
 is_leap_month = day_obj.isLunarLeap()
 wl_can, wl_chi, wl_jieqi, wl_yuan, wl_dun = get_wolong_calendar_data(lunar_m, lunar_d)
 can_gio = get_wushu_dun(wl_can, chi_gio)
 hoa_giap_hien_tai = can_gio + chi_gio
-wl_ju = calculate_correct_ju(wl_yuan, can_gio, chi_gio, wl_jieqi)
 
-# Tính Bàn Âm
+wl_ju = calculate_correct_ju(wl_yuan, can_gio, chi_gio, wl_jieqi)
 data, p_circle, cung_phi_tinh, p_land = lap_que_wolong(can_gio, chi_gio, wl_dun, wl_ju, wl_chi)
 can_tuan = get_xun_leader(can_gio, chi_gio)
 cung_st, stem_colors = qimen_analyzer_hojo(data, can_tuan, p_land)
 
-# --- HỆ DƯƠNG (THIÊN VĂN) ---
-y_dun, y_ju, y_jieqi, y_yuan = calculate_yang_system(actual_date, 7)
+# ==========================================
+# LUỒNG 2: HỆ DƯƠNG (THIÊN VĂN THỰC TẾ)
+# ==========================================
+# 1. Trích xuất Can Chi thực tế từ thiên văn
+day_gz = day_obj.getDayGZ()
+real_day_can = thien_can[day_gz.tg]
+real_day_chi = dia_chi[day_gz.dz]
+real_hour_can = get_wushu_dun(real_day_can, chi_gio)
+real_hoagiap_gio = real_hour_can + chi_gio
 
-# 1. Tính Cửu Cung Phi Tinh Giờ (Hệ Dương - Luôn tính được)
+y_dun, y_jieqi, y_yuan = calculate_yang_system(actual_date, 7)
+
+# 2. Tính Cửu Cung Phi Tinh Giờ (Luôn tính được bằng Độn + Can Chi thực tế)
 yang_star_data = {}
-curr_star = get_hour_nine_star(wl_chi, chi_gio, y_dun)
+curr_star = get_hour_nine_star(real_day_chi, chi_gio, y_dun)
 for cung in WOLONG_FLYING_PATH:
     yang_star_data[cung] = curr_star
     curr_star = 1 if curr_star == 9 else curr_star + 1
 
-# 2. Tính Quẻ Dịch (Ưu tiên Dương, Fallback Âm)
+# 3. Tính Cục Số, Lập Bàn, Tìm Quẻ Dịch (Ưu tiên Dương, Fallback Âm)
+y_ju = None
 final_hex_data = {}
-if y_ju is not None:
-    y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(can_gio, chi_gio, y_dun, y_ju, wl_chi)
+if y_jieqi != "": # Không bị Nhuận
+    # Áp dụng công thức tìm Cục Số chung, truyền Tiết + Nguyên + Can Chi Thực Tế vào
+    y_ju = calculate_correct_ju(y_yuan, real_hour_can, chi_gio, y_jieqi)
+    # Lập bàn Hệ Dương
+    y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(real_hour_can, chi_gio, y_dun, y_ju, real_day_chi)
     global_lower_gate_final = y_data[y_cung_phi_tinh]['mon']
 else:
-    global_lower_gate_final = data[cung_phi_tinh]['mon'] # Lấy từ Bàn Âm
+    global_lower_gate_final = data[cung_phi_tinh]['mon'] # Fallback lấy từ Bàn Âm
 
 global_lower_tri_final = GATE_TO_TRIGRAM.get(global_lower_gate_final, "天")
 for p in range(1, 10):
@@ -487,12 +501,12 @@ for p in range(1, 10):
 # --- XUẤT HIỂN THỊ GIAO DIỆN ---
 y_ju_str = f"{y_ju}局" if y_ju else "(Nhuận)"
 y_info = f"{y_jieqi} {y_yuan}元" if y_ju else ""
-header_yang = f"阳: {actual_date.month}月 {actual_date.day}日 | {wl_can}{wl_chi} | {y_info} | {hoa_giap_hien_tai}时 | {y_dun}{y_ju_str}"
+header_yang = f"阳: {actual_date.month}月 {actual_date.day}日 | {real_day_can}{real_day_chi} | {y_info} | {real_hoagiap_gio}时 | {y_dun}{y_ju_str}"
 
 lunar_date_str = f"<span style='color: #B8860B; font-weight: bold;'>{lunar_m}月 {lunar_d}日 (Nhuận)</span>" if is_leap_month else f"{lunar_m}月 {lunar_d}日"
 header_yin = f"阴: {lunar_date_str} | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}元 | {hoa_giap_hien_tai}时 | {wl_dun}{wl_ju}局"
 
-title = f"<h3 style='margin-bottom:5px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 16px; text-align: center;'>{header_yang}<br><span style='font-size: 18px;'>{header_yin}</span></h3>"
+title = f"<h3 style='margin-bottom:5px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 16px; text-align: center;'>{header_yang}<br>{header_yin}</h3>"
 
 qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, final_hex_data, yang_star_data)
 combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{qimen_board_html}</div></div>"""
@@ -545,7 +559,7 @@ TRAN_HUNG_DICT = {
     "飛宮格": (["人遁", "鬼遁"], ["玉女守門", "天盤丙", "乙奇得使", "丁奇得使"]),
     "青竜逃走": (["人遁", "鬼遁"], ["玉女守門", "天盤丙", "乙奇得使", "丁奇得使"]),
     "白虎猖狂": (["天遁", "神遁"], ["飛鳥跌穴", "丙奇得使"]),
-    "螣蛇妖嬌": (["天遁", "地遁", "神遁"], ["飛鳥跌穴", "乙奇得使", "丙奇得使", "竜遁", "虎遁", "風遁", "雲遁"]),
+    "螣蛇妖娇": (["天遁", "地遁", "神遁"], ["飛鳥跌穴", "乙奇得使", "丙奇得使", "竜遁", "虎遁", "風遁", "雲遁"]),
     "乙奇入墓": (["人遁", "鬼遁", "玉女守門", "丁奇得使"], ["丁奇昇殿"]),
     "干伏吟": (["青竜返首"], []), "干反吟": (["青竜返首"], []),
     "熒惑入白": ([], []), "朱雀投江": ([], []), "丙奇入墓": ([], []), "丁奇入墓": ([], [])
@@ -622,9 +636,9 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 c_gio_scan = dia_chi[c_gio_idx]
                 
                 s_obj = sxtwl.fromSolar(s_date.year, s_date.month, s_date.day)
-                lm_scan, ld_scan = s_obj.getLunarMonth(), s_obj.getLunarDay()
                 
-                # Bàn Âm
+                # --- Tính Bàn Âm ---
+                lm_scan, ld_scan = s_obj.getLunarMonth(), s_obj.getLunarDay()
                 wl_can_s, wl_chi_s, wl_jieqi_s, wl_yuan_s, wl_dun_s = get_wolong_calendar_data(lm_scan, ld_scan)
                 can_gio_scan = get_wushu_dun(wl_can_s, c_gio_scan)
                 wl_ju_s = calculate_correct_ju(wl_yuan_s, can_gio_scan, c_gio_scan, wl_jieqi_s)
@@ -632,15 +646,21 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 can_tuan_scan = get_xun_leader(can_gio_scan, c_gio_scan)
                 cung_st_scan, stem_colors_scan = qimen_analyzer_hojo(scan_data, can_tuan_scan, p_land_scan)
                 
-                # Quẻ Địa Lợi (Ưu tiên Dương, Fallback Âm)
-                y_dun_s, y_ju_s, _, _ = calculate_yang_system(s_date, 7)
+                # --- Tính Bàn Dương (Cho Địa Lợi) ---
+                s_day_gz = s_obj.getDayGZ()
+                s_real_day_can = thien_can[s_day_gz.tg]
+                s_real_day_chi = dia_chi[s_day_gz.dz]
+                s_real_hour_can = get_wushu_dun(s_real_day_can, c_gio_scan)
+                
+                y_dun_s, y_jieqi_s, y_yuan_s = calculate_yang_system(s_date, 7)
                 final_hex_scan = {}
                 
-                if y_ju_s is not None:
-                    y_data_s, _, y_cpt_s, _ = lap_que_wolong(can_gio_scan, c_gio_scan, y_dun_s, y_ju_s, wl_chi_s)
+                if y_jieqi_s != "": # Có Hệ Dương (Không nhuận)
+                    y_ju_s = calculate_correct_ju(y_yuan_s, s_real_hour_can, c_gio_scan, y_jieqi_s)
+                    y_data_s, _, y_cpt_s, _ = lap_que_wolong(s_real_hour_can, c_gio_scan, y_dun_s, y_ju_s, s_real_day_chi)
                     global_lower_gate_final = y_data_s[y_cpt_s]['mon']
                 else:
-                    global_lower_gate_final = scan_data[cpt_scan]['mon'] # Fallback lấy từ Bàn Âm
+                    global_lower_gate_final = scan_data[cpt_scan]['mon'] # Fallback
                 
                 global_lower_tri_final = GATE_TO_TRIGRAM.get(global_lower_gate_final, "天")
                 for p in range(1, 10):
@@ -673,7 +693,7 @@ if st.button("TÌM KIẾM", use_container_width=True):
                     if loc_thien_thoi == "Có":
                         if stem_colors_scan.get(p, "#000000") == "#000000": return False, ""
                             
-                    # Soi Địa Lợi (Sử dụng Quẻ đã Fallback tự động)
+                    # Soi Địa Lợi (Sử dụng Quẻ đã Fallback)
                     if loc_dia_loi == "Có":
                         lower_tri = final_hex_scan.get(p)
                         upper_tri = TIEN_THIEN_MAP.get(p, "天")
