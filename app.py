@@ -197,7 +197,6 @@ def calculate_yang_system(input_date, tz_hours=7):
         return wl_dun, daily_star, "", ""
 
 def get_harmony_stars(A, B):
-    """ Thuật toán Sao Nhân Hòa (Nine Star Ki) """
     Grids = {
         1: [9, 5, 7, 8, 1, 3, 4, 6, 2],
         2: [1, 6, 8, 9, 2, 4, 5, 7, 3],
@@ -209,19 +208,27 @@ def get_harmony_stars(A, B):
         8: [7, 3, 5, 6, 8, 1, 2, 4, 9],
         9: [8, 4, 6, 7, 9, 2, 3, 5, 1]
     }
-    SE = (A + 7) % 9 or 9
-    W = (A + 1) % 9 or 9
+    
+    # Đã sửa lại ĐÚNG TUYỆT ĐỐI công thức bạn cung cấp
+    SE = ((A + 7) % 9) + 1
+    W = ((A + 1) % 9) + 1
     Harmony_Array = [SE, W]
 
+    # Trường hợp 1: B trùng A
     if B == A:
         return []
+    
+    # Trường hợp 2: B nằm trong tập Tương Hội (Harmony)
     elif B in Harmony_Array:
+        # Trả về mảng 1->9 nhưng xóa bỏ A và B
         return [x for x in range(1, 10) if x not in (A, B)]
+        
+    # Trường hợp 3: Xung chiếu / Địch vị
     else:
         Grid_B = Grids[B]
-        Index_A = Grid_B.index(A)
-        Opposite_Index = 8 - Index_A
-        return [Grid_B[Opposite_Index]]
+        Index_A = Grid_B.index(A) # Tìm vị trí của A trong lưới B
+        Opposite_Index = 8 - Index_A # Phản chiếu qua tâm (Index từ 0->8)
+        return [Grid_B[Opposite_Index]] # Trả về mảng chứa 1 số duy nhất
 
 # ==========================================
 # 3. LẬP BÀN TOÁN HỌC
