@@ -95,10 +95,27 @@ def get_wolong_calendar_data(lunar_month, lunar_day):
     return thien_can[(45 + abs_day) % 10], dia_chi[(45 + abs_day) % 12], wl_jieqi, wl_yuan, wl_dun
 
 def get_hour_nine_star(day_branch, hour_branch, dun_type):
+    # Dùng cho Hệ Âm (Giữ nguyên bản cũ của bạn)
     hb_idx = dia_chi.index(hour_branch) 
     start_star = 1 if day_branch in ["子","午","卯","酉"] else (4 if day_branch in ["辰","戌","丑","未"] else 7)
-    if dun_type == "阴遁": start_star = 7 if day_branch in ["辰","戌","丑","未"] else (4 if day_branch in ["寅","申","巳","亥"] else 1)
+    if dun_type == "阴遁": 
+        start_star = 7 if day_branch in ["辰","戌","丑","未"] else (4 if day_branch in ["寅","申","巳","亥"] else 1)
     res = (start_star + hb_idx) % 9 if dun_type == "阳遁" else (start_star - hb_idx) % 9
+    return 9 if res == 0 else res
+
+def get_yang_hour_nine_star(day_branch, hour_branch, dun_type):
+    # Dùng cho Hệ Dương (Theo đúng chuẩn Tử Bạch Quyết)
+    hb_idx = dia_chi.index(hour_branch)
+    if dun_type == "阳遁":
+        if day_branch in ["子", "午", "卯", "酉"]: start_star = 1
+        elif day_branch in ["辰", "戌", "丑", "未"]: start_star = 4
+        else: start_star = 7
+        res = (start_star + hb_idx) % 9
+    else:
+        if day_branch in ["子", "午", "卯", "酉"]: start_star = 9
+        elif day_branch in ["辰", "戌", "丑", "未"]: start_star = 6
+        else: start_star = 3
+        res = (start_star - hb_idx) % 9
     return 9 if res == 0 else res
 
 # --- CÁC HÀM CƠ SỞ VÀ TÍNH TOÁN HỆ DƯƠNG (THIÊN VĂN) ---
