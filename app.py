@@ -209,7 +209,7 @@ def get_harmony_stars(A, B):
 # ==========================================
 # 3. LẬP BÀN TOÁN HỌC
 # ==========================================
-def lap_que_wolong(can_gio, chi_gio, dun_type, ju_num, chi_ngay):
+def lap_que_wolong(can_gio, chi_gio, dun_type, ju_num, chi_ngay, is_yang_system=False):
     cung_data = {i: {'dia': '', 'mon': '', 'thien': '', 'sao': '', 'than': '', 'hour_star': ''} for i in range(1, 10)}
     
     current_val = (10 - ju_num) if dun_type == "阳遁" else ju_num
@@ -224,7 +224,6 @@ def lap_que_wolong(can_gio, chi_gio, dun_type, ju_num, chi_ngay):
         elif current_val < 1: current_val = 9
 
     luc_nghi_gio = get_xun_leader(can_gio, chi_gio)
-    
     p_circle_list = [c for c, can in dia_ban.items() if can == luc_nghi_gio] 
     p_circle = p_circle_list[0] if p_circle_list else 5
 
@@ -247,7 +246,6 @@ def lap_que_wolong(can_gio, chi_gio, dun_type, ju_num, chi_ngay):
             cung_data[WOLONG_OUTER_PALACES[i]]['thien'] = dia_ban[WOLONG_OUTER_PALACES[(i - offset) % 8]]
         cung_data[5]['thien'] = dia_ban[5] 
 
-    # BÁT MÔN (Lưu p_land để dùng cho Ngọc Nữ Thủ Môn)
     p_land = 5
     if p_circle != 5:
         s_steps = thien_can.index(can_gio) + 1
@@ -266,10 +264,14 @@ def lap_que_wolong(can_gio, chi_gio, dun_type, ju_num, chi_ngay):
             for i in range(8):
                 cung_data[WOLONG_OUTER_PALACES[(idx_land + i) % 8]]['mon'] = WOLONG_CLOCKWISE_GATES[(idx_gate + i) % 8]
 
-    # Khóa cứng Trung Cung (Cung 5) tạo Hạ Quái Đoài/Cấn theo chuẩn Lập Hướng
     cung_data[5]['mon'] = "惊门" if dun_type == "阳遁" else "生门"
 
-    curr_star = get_hour_nine_star(chi_ngay, chi_gio, dun_type)
+    # --- CÔNG TẮC CHỌN HỆ ÂM HAY HỆ DƯƠNG ---
+    if is_yang_system:
+        curr_star = get_yang_hour_nine_star(chi_ngay, chi_gio, dun_type)
+    else:
+        curr_star = get_hour_nine_star(chi_ngay, chi_gio, dun_type)
+        
     for cung in WOLONG_FLYING_PATH:
         cung_data[cung]['hour_star'] = curr_star
         curr_star = 1 if curr_star == 9 else curr_star + 1
@@ -295,7 +297,6 @@ def lap_que_wolong(can_gio, chi_gio, dun_type, ju_num, chi_ngay):
             cung_data[WOLONG_OUTER_PALACES[(idx_anchor - i) % 8]]['than'] = DEITIES[i]
     cung_data[5]['than'] = ""
 
-    # Trích xuất cung_phi_tinh (Cung hạ cánh Lạc Thư vào Trung cung) để soi Địa (Hạ Quái)
     cung_phi_tinh = cung_data[5]['hour_star']
 
     return cung_data, p_circle, cung_phi_tinh, p_land
@@ -498,12 +499,9 @@ actual_date = user_dt.date() + timedelta(days=1) if user_dt.hour >= 23 else user
 chi_gio_idx = 0 if user_dt.hour >= 23 else (user_dt.hour + 1) // 2 % 12
 chi_gio = dia_chi[chi_gio_idx]
 
-# --- LẤY DỮ LIỆU LỊCH CHUNG TỪ SXTWL ---
 day_obj = sxtwl.fromSolar(actual_date.year, actual_date.month, actual_date.day)
 
-# ==========================================
-# LUỒNG 1: HỆ ÂM (TRUYỀN THỐNG BẰNG CÔNG THỨC)
-# ==========================================
+# --- BƯỚC 1: LẬP BÀN HỆ ÂM (CẤT VÀO KHO) ---
 lunar_m, lunar_d = day_obj.getLunarMonth(), day_obj.getLunarDay()
 is_leap_month = day_obj.isLunarLeap()
 wl_can, wl_chi, wl_jieqi, wl_yuan, wl_dun = get_wolong_calendar_data(lunar_m, lunar_d)
@@ -511,13 +509,11 @@ can_gio = get_wushu_dun(wl_can, chi_gio)
 hoa_giap_hien_tai = can_gio + chi_gio
 
 wl_ju = calculate_correct_ju(wl_yuan, can_gio, chi_gio, wl_jieqi)
-data, p_circle, cung_phi_tinh, p_land = lap_que_wolong(can_gio, chi_gio, wl_dun, wl_ju, wl_chi)
+data, p_circle, cung_phi_tinh, p_land = lap_que_wolong(can_gio, chi_gio, wl_dun, wl_ju, wl_chi, is_yang_system=False)
 can_tuan = get_xun_leader(can_gio, chi_gio)
 cung_st, stem_colors = qimen_analyzer_hojo(data, can_tuan, p_land)
 
-# ==========================================
-# LUỒNG 2: HỆ DƯƠNG (THIÊN VĂN THỰC TẾ)
-# ==========================================
+# --- BƯỚC 2: TÍNH TOÁN HỆ DƯƠNG (ĐỊA LỢI & NHÂN HÒA) ---
 day_gz = day_obj.getDayGZ()
 real_day_can = thien_can[day_gz.tg]
 real_day_chi = dia_chi[day_gz.dz]
@@ -526,33 +522,29 @@ real_hoagiap_gio = real_hour_can + chi_gio
 
 y_dun, y_daily_star_center, y_jieqi, y_yuan = calculate_yang_system(actual_date, 7)
 
-# 1. Tính Cửu Cung Phi Tinh Giờ
 yang_star_data = {}
-curr_star = get_hour_nine_star(real_day_chi, chi_gio, y_dun)
+curr_star = get_yang_hour_nine_star(real_day_chi, chi_gio, y_dun)
 for cung in WOLONG_FLYING_PATH:
     yang_star_data[cung] = curr_star
     curr_star = 1 if curr_star == 9 else curr_star + 1
 
-# 2. Tính Cửu Cung Phi Tinh Ngày (Phi thuận từ Trung Cung)
 yang_daily_stars = {}
 curr_d_star = y_daily_star_center
 for cung in WOLONG_FLYING_PATH:
     yang_daily_stars[cung] = curr_d_star
     curr_d_star = 1 if curr_d_star == 9 else curr_d_star + 1
 
-# 3. Kích hoạt thuật toán Sao Nhân Hòa
-A_center = yang_daily_stars[5]
-B_center = yang_star_data[5]
-harmony_list = get_harmony_stars(A_center, B_center)
+harmony_list = get_harmony_stars(yang_daily_stars[5], yang_star_data[5])
 
-# 4. Tính Cục Số, Lập Bàn, Tìm Quẻ Dịch (Ưu tiên Dương, Fallback Âm)
 y_ju = None
 final_hex_data = {}
 if y_jieqi != "": 
     y_ju = calculate_correct_ju(y_yuan, real_hour_can, chi_gio, y_jieqi)
-    y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(real_hour_can, chi_gio, y_dun, y_ju, real_day_chi)
+    # Lập bàn Dương (bật công tắc Dương)
+    y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(real_hour_can, chi_gio, y_dun, y_ju, real_day_chi, is_yang_system=True)
     global_lower_gate_final = y_data[y_cung_phi_tinh]['mon']
 else:
+    # Nhuận -> Fallback lấy đúng Bát Môn từ kho Hệ Âm
     global_lower_gate_final = data[cung_phi_tinh]['mon']
 
 global_lower_tri_final = GATE_TO_TRIGRAM.get(global_lower_gate_final, "天")
@@ -572,6 +564,7 @@ title = f"<h3 style='margin-bottom:5px; font-family:sans-serif; color: #1a1a1a; 
 qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, final_hex_data, yang_star_data, yang_daily_stars, harmony_list)
 combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{qimen_board_html}</div></div>"""
 st.components.v1.html(combined_html, height=480, scrolling=True)
+
 
 # ==========================================
 # 7. MODULE SCAN: DỤNG SỰ (TÌM KIẾM)
@@ -708,7 +701,8 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 wl_can_s, wl_chi_s, wl_jieqi_s, wl_yuan_s, wl_dun_s = get_wolong_calendar_data(lm_scan, ld_scan)
                 can_gio_scan = get_wushu_dun(wl_can_s, c_gio_scan)
                 wl_ju_s = calculate_correct_ju(wl_yuan_s, can_gio_scan, c_gio_scan, wl_jieqi_s)
-                scan_data, _, cpt_scan, p_land_scan = lap_que_wolong(can_gio_scan, c_gio_scan, wl_dun_s, wl_ju_s, wl_chi_s)
+                
+                scan_data, _, cpt_scan, p_land_scan = lap_que_wolong(can_gio_scan, c_gio_scan, wl_dun_s, wl_ju_s, wl_chi_s, is_yang_system=False)
                 can_tuan_scan = get_xun_leader(can_gio_scan, c_gio_scan)
                 cung_st_scan, stem_colors_scan = qimen_analyzer_hojo(scan_data, can_tuan_scan, p_land_scan)
                 
@@ -720,9 +714,9 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 
                 y_dun_s, y_daily_star_center_s, y_jieqi_s, y_yuan_s = calculate_yang_system(s_date, 7)
                 
-                # TÍNH NHÂN HÒA
+                # TÍNH NHÂN HÒA HỆ DƯƠNG
                 y_hour_stars = {}
-                hs = get_hour_nine_star(s_real_day_chi, c_gio_scan, y_dun_s)
+                hs = get_yang_hour_nine_star(s_real_day_chi, c_gio_scan, y_dun_s)
                 for c in WOLONG_FLYING_PATH:
                     y_hour_stars[c] = hs
                     hs = 1 if hs == 9 else hs + 1
@@ -735,14 +729,15 @@ if st.button("TÌM KIẾM", use_container_width=True):
 
                 harmony_scan = get_harmony_stars(y_day_stars[5], y_hour_stars[5])
 
-                # TÍNH ĐỊA LỢI
+                # TÍNH ĐỊA LỢI HỆ DƯƠNG
                 final_hex_scan = {}
                 if y_jieqi_s != "": 
                     y_ju_s = calculate_correct_ju(y_yuan_s, s_real_hour_can, c_gio_scan, y_jieqi_s)
-                    y_data_s, _, y_cpt_s, _ = lap_que_wolong(s_real_hour_can, c_gio_scan, y_dun_s, y_ju_s, s_real_day_chi)
+                    y_data_s, _, y_cpt_s, _ = lap_que_wolong(s_real_hour_can, c_gio_scan, y_dun_s, y_ju_s, s_real_day_chi, is_yang_system=True)
                     global_lower_gate_final = y_data_s[y_cpt_s]['mon']
                 else:
-                    global_lower_gate_final = scan_data[cpt_scan]['mon'] # Fallback
+                    # Nhuận -> Fallback lấy đúng kho Hệ Âm
+                    global_lower_gate_final = scan_data[cpt_scan]['mon']
                 
                 global_lower_tri_final = GATE_TO_TRIGRAM.get(global_lower_gate_final, "天")
                 for p in range(1, 10):
@@ -779,9 +774,9 @@ if st.button("TÌM KIẾM", use_container_width=True):
                         lower_tri = final_hex_scan.get(p)
                         upper_tri = TIEN_THIEN_MAP.get(p, "天")
                         out_eval = EVAL_DICT.get(upper_tri, {}).get(lower_tri, "✕")
-                        if out_eval not in ["〇", "△"]: return False, ""
+                        if out_eval not in ["〇"]: return False, ""
 
-                    # BỘ LỌC NHÂN HÒA
+                    # BỘ LỌC NHÂN HÒA (HỆ DƯƠNG)
                     if loc_nhan_hoa == "Có":
                         if y_hour_stars.get(p) not in harmony_scan: return False, ""
 
