@@ -448,9 +448,8 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_d
             
             stem_html = f'<div class="top-left-stems" style="z-index: 1;"><div style="{t_style}">{t_can}</div><div style="{d_style}">{d_can}</div></div>'
             
-            # --- HIỂN THỊ SAO NGÀY VÀ SAO GIỜ ĐỔI MÀU CÁT ---
+            # --- HIỂN THỊ SAO NGÀY VÀ SAO GIỜ ĐỔI MÀU CÁT (NHÂN HÒA) ---
             daily_star_html = f"<div class='center-daily-star'>{yang_daily_stars.get(p, '')}</div>"
-            
             h_color = "#CC0000" if yang_star_data.get(p) in harmony_list else "#555"
             phi_tinh_html = f"<div class='bottom-right-phitinh' style='color: {h_color}; z-index: 1;'>{yang_star_data.get(p, '')}</div>"
 
@@ -519,43 +518,43 @@ cung_st, stem_colors = qimen_analyzer_hojo(data, can_tuan, p_land)
 # ==========================================
 # LUỒNG 2: HỆ DƯƠNG (THIÊN VĂN THỰC TẾ)
 # ==========================================
-# 1. Trích xuất Can Chi thực tế từ thiên văn
 day_gz = day_obj.getDayGZ()
 real_day_can = thien_can[day_gz.tg]
 real_day_chi = dia_chi[day_gz.dz]
 real_hour_can = get_wushu_dun(real_day_can, chi_gio)
 real_hoagiap_gio = real_hour_can + chi_gio
 
+# Tính hệ Dương (Sẽ trả về 4 biến, bao gồm y_daily_star_center)
 y_dun, y_daily_star_center, y_jieqi, y_yuan = calculate_yang_system(actual_date, 7)
 
-# 2. Tính Cửu Cung Phi Tinh Giờ 
+# 1. Tính Cửu Cung Phi Tinh Giờ
 yang_star_data = {}
 curr_star = get_hour_nine_star(real_day_chi, chi_gio, y_dun)
 for cung in WOLONG_FLYING_PATH:
     yang_star_data[cung] = curr_star
     curr_star = 1 if curr_star == 9 else curr_star + 1
 
-# 3. Tính Cửu Cung Phi Tinh NGÀY (Phi thuận từ Trung cung)
+# 2. Tính Cửu Cung Phi Tinh Ngày (Phi thuận)
 yang_daily_stars = {}
 curr_d_star = y_daily_star_center
 for cung in WOLONG_FLYING_PATH:
     yang_daily_stars[cung] = curr_d_star
     curr_d_star = 1 if curr_d_star == 9 else curr_d_star + 1
 
-# 4. Tính mảng SAO NHÂN HÒA (Cát khí)
+# 3. Kích hoạt thuật toán Sao Nhân Hòa
 A_center = yang_daily_stars[5]
 B_center = yang_star_data[5]
 harmony_list = get_harmony_stars(A_center, B_center)
 
-# 5. Tính Cục Số để Lập Bàn, Tìm Quẻ Dịch (Ưu tiên Dương, Fallback Âm)
+# 4. Tính Cục Số, Lập Bàn, Tìm Quẻ Dịch (Ưu tiên Dương, Fallback Âm)
 y_ju = None
 final_hex_data = {}
-if y_jieqi != "": # Không bị Nhuận
+if y_jieqi != "": 
     y_ju = calculate_correct_ju(y_yuan, real_hour_can, chi_gio, y_jieqi)
     y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(real_hour_can, chi_gio, y_dun, y_ju, real_day_chi)
     global_lower_gate_final = y_data[y_cung_phi_tinh]['mon']
 else:
-    global_lower_gate_final = data[cung_phi_tinh]['mon'] # Fallback lấy từ Bàn Âm
+    global_lower_gate_final = data[cung_phi_tinh]['mon']
 
 global_lower_tri_final = GATE_TO_TRIGRAM.get(global_lower_gate_final, "天")
 for p in range(1, 10):
@@ -571,7 +570,7 @@ header_yin = f"阴: {lunar_date_str} | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}�
 
 title = f"<h3 style='margin-bottom:5px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 16px; text-align: center;'>{header_yang}<br>{header_yin}</h3>"
 
-# Cập nhật hàm Render truyền thêm biến mới
+# Render HTML truyền thêm 2 biến mới
 qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, final_hex_data, yang_star_data, yang_daily_stars, harmony_list)
 combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{qimen_board_html}</div></div>"""
 st.components.v1.html(combined_html, height=480, scrolling=True)
@@ -683,13 +682,11 @@ if st.button("TÌM KIẾM", use_container_width=True):
         with st.spinner('Đang quét dữ liệu tương lai...'):
             results_normal = []
             
-            # --- CĂN CHUẨN GIỜ BẮT ĐẦU VỀ ĐẦU GIỜ LẺ CỦA CAN CHI ---
             if user_dt.hour % 2 == 0:
                 base_dt = (user_dt - timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
             else:
                 base_dt = user_dt.replace(minute=0, second=0, microsecond=0)
                 
-            # Lùi 1 nhịp để vòng lặp đầu tiên cộng 2 vào là vừa khít giờ hiện tại
             current_scan_dt = base_dt - timedelta(hours=2) 
             max_limit = 4320
             
@@ -700,7 +697,6 @@ if st.button("TÌM KIẾM", use_container_width=True):
             loops = 0
             while loops < max_limit: 
                 if len(results_normal) >= 10: break
-
                 loops += 1
                 current_scan_dt += timedelta(hours=2) 
                 
@@ -725,10 +721,10 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 s_real_day_chi = dia_chi[s_day_gz.dz]
                 s_real_hour_can = get_wushu_dun(s_real_day_can, c_gio_scan)
                 
-                y_dun_s, y_jieqi_s, y_yuan_s = calculate_yang_system(s_date, 7)
+                y_dun_s, y_daily_star_center_s, y_jieqi_s, y_yuan_s = calculate_yang_system(s_date, 7)
                 final_hex_scan = {}
                 
-                if y_jieqi_s != "": # Có Hệ Dương (Không nhuận)
+                if y_jieqi_s != "": 
                     y_ju_s = calculate_correct_ju(y_yuan_s, s_real_hour_can, c_gio_scan, y_jieqi_s)
                     y_data_s, _, y_cpt_s, _ = lap_que_wolong(s_real_hour_can, c_gio_scan, y_dun_s, y_ju_s, s_real_day_chi)
                     global_lower_gate_final = y_data_s[y_cpt_s]['mon']
@@ -739,13 +735,9 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 for p in range(1, 10):
                     if p != 5: final_hex_scan[p] = global_lower_tri_final
                 
-                # Sửa định dạng chuỗi giờ (Luôn kết thúc là phút 59)
                 end_scan_dt = current_scan_dt + timedelta(hours=1, minutes=59)
-                
-                # Nếu giờ bắt đầu là 23:00, nó vắt sang ngày hôm sau nên in ngày s_date (của Can Chi)
                 display_date = s_date if current_scan_dt.hour == 23 else current_scan_dt.date()
                 time_str = f"{display_date.strftime('%d/%m')} {current_scan_dt.strftime('%H:%M')} - {end_scan_dt.strftime('%H:%M')}"
-                
                 c_str = f"{wl_dun_s} {wl_ju_s}局 | Giờ {can_gio_scan}{c_gio_scan}"
                 
                 target_palace = huong_list[loc_huong]
@@ -771,7 +763,6 @@ if st.button("TÌM KIẾM", use_container_width=True):
                     if loc_thien_thoi == "Có":
                         if stem_colors_scan.get(p, "#000000") == "#000000": return False, ""
                             
-                    # Soi Địa Lợi (Sử dụng Quẻ đã Fallback)
                     if loc_dia_loi == "Có":
                         lower_tri = final_hex_scan.get(p)
                         upper_tri = TIEN_THIEN_MAP.get(p, "天")
@@ -805,21 +796,18 @@ if st.button("TÌM KIẾM", use_container_width=True):
                     ten_cung = [k for k, v in huong_list.items() if v == target_palace][0]
                     note_str = f" | Phối hợp: {dung_cach_tim_thay}" if dung_cach_tim_thay else ""
                     
-                    # Bóc tách Cát/Hung cách, giữ nguyên cấp độ (1)(2) và nhúng màu Đỏ/Đen
                     colored_formations = []
                     for html_name, color in cung_st_scan[target_palace]:
-                        clean_name = re.sub(r'<[^>]+>', '', html_name) # Trích xuất chữ thuần ví dụ: "(1) 青竜返首"
+                        clean_name = re.sub(r'<[^>]+>', '', html_name) 
                         colored_formations.append(f"<span style='color: {color}; font-weight: 500;'>{clean_name}</span>")
                         
                     cach_cuc_str = f" | ❖ {', '.join(colored_formations)}" if colored_formations else ""
-                    
                     results_normal.append((time_str, c_str, ten_cung, note_str, cach_cuc_str))
 
             if results_normal:
                 st.success(f"**TÌM THẤY {len(results_normal)} THỜI ĐIỂM THỎA MÃN TẤT CẢ ĐIỀU KIỆN:**")
                 for idx, (t_str, canchi_str, cung_str, note, cach_cuc) in enumerate(results_normal):
                     h_text = f" | Hướng: {cung_str}" if cung_str else ""
-                    # Dùng st.markdown với unsafe_allow_html=True để hiển thị được màu HTML
                     st.markdown(f"**{idx+1}.** {t_str} | {canchi_str}{h_text}{note}{cach_cuc}", unsafe_allow_html=True)
             else:
                 st.warning("Không tìm thấy thời điểm nào thỏa mãn ĐỒNG THỜI các điều kiện của bạn.")
