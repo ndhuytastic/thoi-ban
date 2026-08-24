@@ -101,7 +101,7 @@ def get_hour_nine_star(day_branch, hour_branch, dun_type):
     res = (start_star + hb_idx) % 9 if dun_type == "阳遁" else (start_star - hb_idx) % 9
     return 9 if res == 0 else res
 
-# --- HỆ THỐNG TÍNH TOÁN DƯƠNG BÀN (NHẬT BÀN THIÊN VĂN) ---
+# --- CÁC HÀM CƠ SỞ VÀ TÍNH TOÁN HỆ DƯƠNG (THIÊN VĂN) ---
 def get_solstice(year, s_type, local_tz):
     if s_type == "DC":
         solstice = ephem.next_winter_solstice(f"{year}-11-01")
@@ -127,39 +127,84 @@ def get_closest_giap_ty(target_date):
     return GT_before if dist_before < dist_after else GT_after
 
 def calculate_yang_system(input_date, tz_hours=7):
+    """ Hàm cốt lõi: Tính Âm/Dương Độn và Sao Ngày bằng Timeline Anchoring 5 mốc """
     local_tz = timezone(timedelta(hours=tz_hours))
-    current_year = input_date.year
+    y = input_date.year
     
-    DC_prev = get_solstice(current_year - 1, "DC", local_tz)
-    HC_curr = get_solstice(current_year, "HC", local_tz)
-    DC_curr = get_solstice(current_year, "DC", local_tz)
+    # 1. Lấy 5 mốc giao tiết trải dài từ 2 năm trước đến năm nay
+    dc_y2 = get_solstice(y - 2, "DC", local_tz)
+    hc_y1 = get_solstice(y - 1, "HC", local_tz)
+    dc_y1 = get_solstice(y - 1, "DC", local_tz)
+    hc_y  = get_solstice(y, "HC", local_tz)
+    dc_y  = get_solstice(y, "DC", local_tz)
     
-    Anchor_Duong_0 = get_closest_giap_ty(DC_prev)
-    Anchor_Am = get_closest_giap_ty(HC_curr)
-    Anchor_Duong_1 = get_closest_giap_ty(DC_curr)
+    # 2. Dựng các Trạm kiểm soát Giáp Tý (Anchor) và gán Độn
+    anchors = [
+        (get_closest_giap_ty(dc_y2), "阳遁"),
+        (get_closest_giap_ty(hc_y1), "阴遁"),
+        (get_closest_giap_ty(dc_y1), "阳遁"),
+        (get_closest_giap_ty(hc_y), "阴遁"),
+        (get_closest_giap_ty(dc_y), "阳遁")
+    ]
     
-    if input_date < Anchor_Am:
-        wl_dun = "阳遁"
-        anchor_date = Anchor_Duong_0
-        jieqi_list = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种"]
-    elif input_date >= Anchor_Am and input_date < Anchor_Duong_1:
-        wl_dun = "阴遁"
-        anchor_date = Anchor_Am
-        jieqi_list = ["夏至", "小暑", "大暑", "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪"]
-    else:
-        wl_dun = "阳遁"
-        anchor_date = Anchor_Duong_1
-        jieqi_list = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种"]
-        
+    # 3. Sắp xếp Timeline từ Tương lai lùi dần về Quá khứ
+    anchors.sort(key=lambda x: x[0], reverse=True)
+    
+    wl_dun = None
+    anchor_date = None
+    
+    # Quét lùi để tìm bến đỗ Giáp Tý
+    for anchor_dt, dun_type in anchors:
+        if input_date >= anchor_dt:
+            wl_dun = dun_type
+            anchor_date = anchor_dt
+            break
+            
+    # 4. Tính toán Sao Ngày (Cục Số) với toán tử Modulo xuyên Nhuận
     days_passed = (input_date - anchor_date).days
+    index = days_passed % 9
+    daily_star = (index + 1) if wl_dun == "阳遁" else (9 - index)
     
+    # 5. Phân bổ Tiết Khí và Nguyên (Kiểm tra Nhuận)
+    if wl_dun == "阳遁":
+        jieqi_list = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种"]
+    else:
+        jieqi_list = ["夏至", "小暑", "大暑", "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪"]
+        
     if days_passed < 180:
         wl_jieqi = jieqi_list[days_passed // 15]
         wl_yuan = ["上", "中", "下"][(days_passed % 15) // 5]
-        return wl_dun, wl_jieqi, wl_yuan
+        return wl_dun, daily_star, wl_jieqi, wl_yuan
     else:
-        # Rơi vào khoảng Nhuận
-        return wl_dun, "", ""
+        # Vùng Nhuận: Vẫn có Âm/Dương độn, Vẫn có Sao ngày, nhưng Khuyết Tiết/Nguyên
+        return wl_dun, daily_star, "", ""
+
+def get_harmony_stars(A, B):
+    """ Thuật toán Sao Nhân Hòa (Nine Star Ki) """
+    Grids = {
+        1: [9, 5, 7, 8, 1, 3, 4, 6, 2],
+        2: [1, 6, 8, 9, 2, 4, 5, 7, 3],
+        3: [2, 7, 9, 1, 3, 5, 6, 8, 4],
+        4: [3, 8, 1, 2, 4, 6, 7, 9, 5],
+        5: [4, 9, 2, 3, 5, 7, 8, 1, 6],
+        6: [5, 1, 3, 4, 6, 8, 9, 2, 7],
+        7: [6, 2, 4, 5, 7, 9, 1, 3, 8],
+        8: [7, 3, 5, 6, 8, 1, 2, 4, 9],
+        9: [8, 4, 6, 7, 9, 2, 3, 5, 1]
+    }
+    SE = (A + 7) % 9 or 9
+    W = (A + 1) % 9 or 9
+    Harmony_Array = [SE, W]
+
+    if B == A:
+        return []
+    elif B in Harmony_Array:
+        return [x for x in range(1, 10) if x not in (A, B)]
+    else:
+        Grid_B = Grids[B]
+        Index_A = Grid_B.index(A)
+        Opposite_Index = 8 - Index_A
+        return [Grid_B[Opposite_Index]]
 
 # ==========================================
 # 3. LẬP BÀN TOÁN HỌC
@@ -372,7 +417,7 @@ def qimen_analyzer_hojo(cung_data, can_tuan, p_land):
 # ==========================================
 # 5. GIAO DIỆN HTML RENDER 
 # ==========================================
-def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_data, yang_star_data):
+def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_data, yang_star_data, yang_daily_stars, harmony_list):
     luoi_lac_thu = [[4, 9, 2], [3, 5, 7], [8, 1, 6]]
     html = """
     <style>
@@ -381,8 +426,11 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_d
         .top-left-stems { position: absolute; top: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; line-height: 1.2; gap: 6px;}
         .top-right-panel { position: absolute; top: 4px; right: 5px; display: flex; flex-direction: column; align-items: flex-end; text-align: right; font-size: 11px;}
         .formation-item { margin-top: 1px; font-weight: bold; letter-spacing: 1px; color: #000; }
-        .bottom-right-phitinh { position: absolute; bottom: 3px; right: 5px; font-size: 15px; color: #555; font-weight: bold; }
+        .bottom-right-phitinh { position: absolute; bottom: 3px; right: 5px; font-size: 15px; font-weight: bold; }
         .bottom-left-hex { position: absolute; bottom: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; }
+        
+        /* CSS cho Cửu Tinh Ngày nằm ở chính giữa ô */
+        .center-daily-star { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: bold; color: #b3b3b3; z-index: 0; pointer-events: none;}
     </style>
     <table class="qmdj-table">
     """
@@ -398,11 +446,16 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_d
             t_style = f"font-weight: bold; color: {base_color}; font-size: 16px; text-decoration: {t_decor}; text-underline-offset: 4px; text-decoration-thickness: 2px;"
             d_style = f"font-weight: bold; color: {base_color}; font-size: 16px; text-decoration: {d_decor}; text-underline-offset: 4px; text-decoration-thickness: 2px;"
             
-            stem_html = f'<div class="top-left-stems"><div style="{t_style}">{t_can}</div><div style="{d_style}">{d_can}</div></div>'
-            phi_tinh_html = f"<div class='bottom-right-phitinh'>{yang_star_data.get(p, '')}</div>"
+            stem_html = f'<div class="top-left-stems" style="z-index: 1;"><div style="{t_style}">{t_can}</div><div style="{d_style}">{d_can}</div></div>'
+            
+            # --- HIỂN THỊ SAO NGÀY VÀ SAO GIỜ ĐỔI MÀU CÁT ---
+            daily_star_html = f"<div class='center-daily-star'>{yang_daily_stars.get(p, '')}</div>"
+            
+            h_color = "#CC0000" if yang_star_data.get(p) in harmony_list else "#555"
+            phi_tinh_html = f"<div class='bottom-right-phitinh' style='color: {h_color}; z-index: 1;'>{yang_star_data.get(p, '')}</div>"
 
             if p == 5:
-                html += f'<td class="qmdj-td" style="background-color: transparent; text-align: center;">{stem_html}{phi_tinh_html}</td>'
+                html += f'<td class="qmdj-td" style="background-color: transparent; text-align: center;">{stem_html}{daily_star_html}{phi_tinh_html}</td>'
             else:
                 outer_hex_html = ""
                 global_lower_tri = final_hex_data.get(p)
@@ -415,7 +468,7 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_d
                     out_hex_name = HEX_NAME_DICT.get((out_upper_tri, global_lower_tri), "Không rõ")
                     
                     outer_hex_html = f"""
-                    <div class="bottom-left-hex">
+                    <div class="bottom-left-hex" style="z-index: 1;">
                         <div style="font-size:26px; line-height:0.85; color:{out_hex_color}; margin-bottom: 2px; text-align: center;">
                             {TRIGRAM_UNICODE[out_upper_tri]}<br>{TRIGRAM_UNICODE[global_lower_tri]}
                         </div>
@@ -424,8 +477,8 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_d
                     """
 
                 form_html = "".join([f"<div class='formation-item' style='color:{f_color};'>{f_name}</div>" for f_name, f_color in cung_status[p]])
-                top_right_html = f"<div class='top-right-panel'>{form_html}</div>"
-                html += f'<td class="qmdj-td" style="background-color: transparent;">{top_right_html}{stem_html}{outer_hex_html}{phi_tinh_html}</td>'
+                top_right_html = f"<div class='top-right-panel' style='z-index: 1;'>{form_html}</div>"
+                html += f'<td class="qmdj-td" style="background-color: transparent;">{top_right_html}{stem_html}{outer_hex_html}{daily_star_html}{phi_tinh_html}</td>'
         html += "</tr>"
     html += "</table>"
     return html
@@ -473,22 +526,32 @@ real_day_chi = dia_chi[day_gz.dz]
 real_hour_can = get_wushu_dun(real_day_can, chi_gio)
 real_hoagiap_gio = real_hour_can + chi_gio
 
-y_dun, y_jieqi, y_yuan = calculate_yang_system(actual_date, 7)
+y_dun, y_daily_star_center, y_jieqi, y_yuan = calculate_yang_system(actual_date, 7)
 
-# 2. Tính Cửu Cung Phi Tinh Giờ (Luôn tính được bằng Độn + Can Chi thực tế)
+# 2. Tính Cửu Cung Phi Tinh Giờ 
 yang_star_data = {}
 curr_star = get_hour_nine_star(real_day_chi, chi_gio, y_dun)
 for cung in WOLONG_FLYING_PATH:
     yang_star_data[cung] = curr_star
     curr_star = 1 if curr_star == 9 else curr_star + 1
 
-# 3. Tính Cục Số, Lập Bàn, Tìm Quẻ Dịch (Ưu tiên Dương, Fallback Âm)
+# 3. Tính Cửu Cung Phi Tinh NGÀY (Phi thuận từ Trung cung)
+yang_daily_stars = {}
+curr_d_star = y_daily_star_center
+for cung in WOLONG_FLYING_PATH:
+    yang_daily_stars[cung] = curr_d_star
+    curr_d_star = 1 if curr_d_star == 9 else curr_d_star + 1
+
+# 4. Tính mảng SAO NHÂN HÒA (Cát khí)
+A_center = yang_daily_stars[5]
+B_center = yang_star_data[5]
+harmony_list = get_harmony_stars(A_center, B_center)
+
+# 5. Tính Cục Số để Lập Bàn, Tìm Quẻ Dịch (Ưu tiên Dương, Fallback Âm)
 y_ju = None
 final_hex_data = {}
 if y_jieqi != "": # Không bị Nhuận
-    # Áp dụng công thức tìm Cục Số chung, truyền Tiết + Nguyên + Can Chi Thực Tế vào
     y_ju = calculate_correct_ju(y_yuan, real_hour_can, chi_gio, y_jieqi)
-    # Lập bàn Hệ Dương
     y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(real_hour_can, chi_gio, y_dun, y_ju, real_day_chi)
     global_lower_gate_final = y_data[y_cung_phi_tinh]['mon']
 else:
@@ -508,7 +571,8 @@ header_yin = f"阴: {lunar_date_str} | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}�
 
 title = f"<h3 style='margin-bottom:5px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 16px; text-align: center;'>{header_yang}<br>{header_yin}</h3>"
 
-qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, final_hex_data, yang_star_data)
+# Cập nhật hàm Render truyền thêm biến mới
+qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, final_hex_data, yang_star_data, yang_daily_stars, harmony_list)
 combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{qimen_board_html}</div></div>"""
 st.components.v1.html(combined_html, height=480, scrolling=True)
 
