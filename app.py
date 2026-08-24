@@ -429,8 +429,8 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_d
         .bottom-right-phitinh { position: absolute; bottom: 3px; right: 5px; font-size: 15px; font-weight: bold; }
         .bottom-left-hex { position: absolute; bottom: 5px; left: 5px; display: flex; flex-direction: column; align-items: center; width: 44px; }
         
-        /* CSS cho Cửu Tinh Ngày nằm ở chính giữa ô */
-        .center-daily-star { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: bold; color: #b3b3b3; z-index: 0; pointer-events: none;}
+        /* CSS CHO SAO NGÀY Ở GIỮA Ô */
+        .center-daily-star { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: bold; color: #d9d9d9; z-index: 0; pointer-events: none;}
     </style>
     <table class="qmdj-table">
     """
@@ -448,7 +448,7 @@ def render_html_table(cung_data, cung_status, stem_colors, can_tuan, final_hex_d
             
             stem_html = f'<div class="top-left-stems" style="z-index: 1;"><div style="{t_style}">{t_can}</div><div style="{d_style}">{d_can}</div></div>'
             
-            # --- HIỂN THỊ SAO NGÀY VÀ SAO GIỜ ĐỔI MÀU CÁT (NHÂN HÒA) ---
+            # --- CODE XỬ LÝ IN SAO NGÀY & ĐỔI MÀU SAO GIỜ ---
             daily_star_html = f"<div class='center-daily-star'>{yang_daily_stars.get(p, '')}</div>"
             h_color = "#CC0000" if yang_star_data.get(p) in harmony_list else "#555"
             phi_tinh_html = f"<div class='bottom-right-phitinh' style='color: {h_color}; z-index: 1;'>{yang_star_data.get(p, '')}</div>"
@@ -524,7 +524,6 @@ real_day_chi = dia_chi[day_gz.dz]
 real_hour_can = get_wushu_dun(real_day_can, chi_gio)
 real_hoagiap_gio = real_hour_can + chi_gio
 
-# Tính hệ Dương (Sẽ trả về 4 biến, bao gồm y_daily_star_center)
 y_dun, y_daily_star_center, y_jieqi, y_yuan = calculate_yang_system(actual_date, 7)
 
 # 1. Tính Cửu Cung Phi Tinh Giờ
@@ -534,7 +533,7 @@ for cung in WOLONG_FLYING_PATH:
     yang_star_data[cung] = curr_star
     curr_star = 1 if curr_star == 9 else curr_star + 1
 
-# 2. Tính Cửu Cung Phi Tinh Ngày (Phi thuận)
+# 2. Tính Cửu Cung Phi Tinh Ngày (Phi thuận từ Trung Cung)
 yang_daily_stars = {}
 curr_d_star = y_daily_star_center
 for cung in WOLONG_FLYING_PATH:
@@ -570,15 +569,14 @@ header_yin = f"阴: {lunar_date_str} | {wl_can}{wl_chi} | {wl_jieqi} {wl_yuan}�
 
 title = f"<h3 style='margin-bottom:5px; font-family:sans-serif; color: #1a1a1a; font-weight: normal; font-size: 16px; text-align: center;'>{header_yang}<br>{header_yin}</h3>"
 
-# Render HTML truyền thêm 2 biến mới
 qimen_board_html = render_html_table(data, cung_st, stem_colors, can_tuan, final_hex_data, yang_star_data, yang_daily_stars, harmony_list)
 combined_html = f"""<div style="display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 10px;"><div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 510px;">{title}{qimen_board_html}</div></div>"""
 st.components.v1.html(combined_html, height=480, scrolling=True)
 
-
 # ==========================================
 # 7. MODULE SCAN: DỤNG SỰ (TÌM KIẾM)
 # ==========================================
+import re
 st.markdown("---")
 st.markdown("<h3 style='text-align: center; color: #333; font-family: sans-serif; margin-bottom: 20px;'>DỤNG SỰ</h3>", unsafe_allow_html=True)
 
@@ -656,11 +654,12 @@ with st.container():
     loc_cat_cach = c7.selectbox("吉格 (Cát Cách)", options=cat_cach_list)
     
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    c9, c10, c11, c12 = st.columns(4)
+    c9, c10, c11, c12, c13 = st.columns([1,1,1,1,1])
     loc_tran_hung = c9.selectbox("鎮凶 (Trấn Hung)", options=tran_hung_list)
     loc_thoi_cat = c10.selectbox("催吉 (Thôi Cát)", options=thoi_cat_list)
     loc_thien_thoi = c11.selectbox("天时 (Thiên Thời)", options=["", "Có"])
     loc_dia_loi = c12.selectbox("地利 (Địa Lợi)", options=["", "Có"])
+    loc_nhan_hoa = c13.selectbox("人和 (Nhân Hòa)", options=["", "Có"])
 
 def find_fulfilled_plan(plan_list, d_cung, status_cung, can_tuan_scan):
     for req in plan_list:
@@ -672,7 +671,6 @@ def find_fulfilled_plan(plan_list, d_cung, status_cung, can_tuan_scan):
     return None
 
 if st.button("TÌM KIẾM", use_container_width=True):
-    import re
     val_tran_hung = extract_raw_name(loc_tran_hung)
     val_thoi_cat = extract_raw_name(loc_thoi_cat)
     
@@ -703,7 +701,6 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 s_date = current_scan_dt.date() + timedelta(days=1) if current_scan_dt.hour >= 23 else current_scan_dt.date()
                 c_gio_idx = 0 if current_scan_dt.hour >= 23 else (current_scan_dt.hour + 1) // 2 % 12
                 c_gio_scan = dia_chi[c_gio_idx]
-                
                 s_obj = sxtwl.fromSolar(s_date.year, s_date.month, s_date.day)
                 
                 # --- Tính Bàn Âm ---
@@ -715,15 +712,31 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 can_tuan_scan = get_xun_leader(can_gio_scan, c_gio_scan)
                 cung_st_scan, stem_colors_scan = qimen_analyzer_hojo(scan_data, can_tuan_scan, p_land_scan)
                 
-                # --- Tính Bàn Dương (Cho Địa Lợi) ---
+                # --- Tính Bàn Dương (Cho Địa Lợi & Nhân Hòa) ---
                 s_day_gz = s_obj.getDayGZ()
                 s_real_day_can = thien_can[s_day_gz.tg]
                 s_real_day_chi = dia_chi[s_day_gz.dz]
                 s_real_hour_can = get_wushu_dun(s_real_day_can, c_gio_scan)
                 
                 y_dun_s, y_daily_star_center_s, y_jieqi_s, y_yuan_s = calculate_yang_system(s_date, 7)
-                final_hex_scan = {}
                 
+                # TÍNH NHÂN HÒA
+                y_hour_stars = {}
+                hs = get_hour_nine_star(s_real_day_chi, c_gio_scan, y_dun_s)
+                for c in WOLONG_FLYING_PATH:
+                    y_hour_stars[c] = hs
+                    hs = 1 if hs == 9 else hs + 1
+
+                y_day_stars = {}
+                ds = y_daily_star_center_s
+                for c in WOLONG_FLYING_PATH:
+                    y_day_stars[c] = ds
+                    ds = 1 if ds == 9 else ds + 1
+
+                harmony_scan = get_harmony_stars(y_day_stars[5], y_hour_stars[5])
+
+                # TÍNH ĐỊA LỢI
+                final_hex_scan = {}
                 if y_jieqi_s != "": 
                     y_ju_s = calculate_correct_ju(y_yuan_s, s_real_hour_can, c_gio_scan, y_jieqi_s)
                     y_data_s, _, y_cpt_s, _ = lap_que_wolong(s_real_hour_can, c_gio_scan, y_dun_s, y_ju_s, s_real_day_chi)
@@ -756,7 +769,6 @@ if st.button("TÌM KIẾM", use_container_width=True):
                     if loc_mon and d['mon'] != loc_mon: return False, ""
                     if loc_tinh and d['sao'] != loc_tinh: return False, ""
                     if loc_than and d['than'] != loc_than: return False, ""
-                    
                     if val_cat_cach:
                         if not any(val_cat_cach in item[0] for item in cung_st_scan[p]): return False, ""
                         
@@ -768,6 +780,10 @@ if st.button("TÌM KIẾM", use_container_width=True):
                         upper_tri = TIEN_THIEN_MAP.get(p, "天")
                         out_eval = EVAL_DICT.get(upper_tri, {}).get(lower_tri, "✕")
                         if out_eval not in ["〇", "△"]: return False, ""
+
+                    # BỘ LỌC NHÂN HÒA
+                    if loc_nhan_hoa == "Có":
+                        if y_hour_stars.get(p) not in harmony_scan: return False, ""
 
                     if val_tran_hung or val_thoi_cat:
                         found_pa1 = find_fulfilled_plan(pa1_reqs, d, cung_st_scan[p], can_tuan_scan)
