@@ -230,6 +230,23 @@ def get_harmony_stars(A, B):
         Opposite_Index = 8 - Index_A # Phản chiếu qua tâm (Index từ 0->8)
         return [Grid_B[Opposite_Index]] # Trả về mảng chứa 1 số duy nhất
 
+def calculate_yang_ju(yuan, day_can, day_chi, jieqi, dun_type):
+    """ Hàm tính Cục Số độc quyền cho Hệ Dương dựa trên Tuần Thủ của Ngày """
+    # 1. Lấy cục cơ bản từ Tiết Khí và Nguyên
+    yuan_idx = 0 if yuan == "上" else (1 if yuan == "中" else 2)
+    base_ju = solar_term_ju[jieqi][yuan_idx]
+    
+    # 2. Tìm Tuần Thủ của Ngày và quy đổi thành độ lệch (0 -> 5)
+    xun_leader = get_xun_leader(day_can, day_chi) 
+    offset_map = {"戊": 0, "己": 1, "庚": 2, "辛": 3, "壬": 4, "癸": 5}
+    offset = offset_map.get(xun_leader, 0)
+    
+    # 3. Tính Cục Số cuối cùng
+    if dun_type == "阳遁":
+        return (base_ju + offset - 1) % 9 + 1
+    else:
+        return (base_ju - offset - 1) % 9 + 1
+
 # ==========================================
 # 3. LẬP BÀN TOÁN HỌC
 # ==========================================
@@ -563,8 +580,8 @@ harmony_list = get_harmony_stars(yang_daily_stars[5], yang_star_data[5])
 y_ju = None
 final_hex_data = {}
 if y_jieqi != "": 
-    y_ju = calculate_correct_ju(y_yuan, real_hour_can, chi_gio, y_jieqi)
-    # Lập bàn Dương (bật công tắc Dương)
+    # ĐÃ SỬA THÀNH HÀM MỚI (TÍNH THEO CAN CHI NGÀY THỰC TẾ)
+    y_ju = calculate_yang_ju(y_yuan, real_day_can, real_day_chi, y_jieqi, y_dun)
     y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(real_hour_can, chi_gio, y_dun, y_ju, real_day_chi, is_yang_system=True)
     global_lower_gate_final = y_data[y_cung_phi_tinh]['mon']
 else:
@@ -756,7 +773,8 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 # TÍNH ĐỊA LỢI HỆ DƯƠNG
                 final_hex_scan = {}
                 if y_jieqi_s != "": 
-                    y_ju_s = calculate_correct_ju(y_yuan_s, s_real_hour_can, c_gio_scan, y_jieqi_s)
+                    # ĐÃ SỬA THÀNH HÀM MỚI (TÍNH THEO CAN CHI NGÀY CỦA VÒNG LẶP SCAN)
+                    y_ju_s = calculate_yang_ju(y_yuan_s, s_real_day_can, s_real_day_chi, y_jieqi_s, y_dun_s)
                     y_data_s, _, y_cpt_s, _ = lap_que_wolong(s_real_hour_can, c_gio_scan, y_dun_s, y_ju_s, s_real_day_chi, is_yang_system=True)
                     global_lower_gate_final = y_data_s[y_cpt_s]['mon']
                 else:
