@@ -580,8 +580,8 @@ harmony_list = get_harmony_stars(yang_daily_stars[5], yang_star_data[5])
 y_ju = None
 final_hex_data = {}
 if y_jieqi != "": 
-    # ĐÃ SỬA THÀNH HÀM MỚI (TÍNH THEO CAN CHI NGÀY THỰC TẾ)
-    y_ju = calculate_yang_ju(y_yuan, real_day_can, real_day_chi, y_jieqi, y_dun)
+    # Dùng Can Chi GIỜ để tính Cục Số
+    y_ju = calculate_yang_ju(y_yuan, real_hour_can, chi_gio, y_jieqi, y_dun)
     y_data, _, y_cung_phi_tinh, _ = lap_que_wolong(real_hour_can, chi_gio, y_dun, y_ju, real_day_chi, is_yang_system=True)
     global_lower_gate_final = y_data[y_cung_phi_tinh]['mon']
 else:
@@ -773,8 +773,8 @@ if st.button("TÌM KIẾM", use_container_width=True):
                 # TÍNH ĐỊA LỢI HỆ DƯƠNG
                 final_hex_scan = {}
                 if y_jieqi_s != "": 
-                    # ĐÃ SỬA THÀNH HÀM MỚI (TÍNH THEO CAN CHI NGÀY CỦA VÒNG LẶP SCAN)
-                    y_ju_s = calculate_yang_ju(y_yuan_s, s_real_day_can, s_real_day_chi, y_jieqi_s, y_dun_s)
+                    # Dùng Can Chi GIỜ để tính Cục Số
+                    y_ju_s = calculate_yang_ju(y_yuan_s, s_real_hour_can, c_gio_scan, y_jieqi_s, y_dun_s)
                     y_data_s, _, y_cpt_s, _ = lap_que_wolong(s_real_hour_can, c_gio_scan, y_dun_s, y_ju_s, s_real_day_chi, is_yang_system=True)
                     global_lower_gate_final = y_data_s[y_cpt_s]['mon']
                 else:
